@@ -14,6 +14,7 @@ class ImageClassifierApp:
         self.people_images = []
         self.screenshot_images = []
         self.current_list = "all"  # can be "all", "people", "screenshot"
+        self.image_cache = {}  # path -> PhotoImage
         self.setup_ui()
 
     def setup_ui(self):
@@ -34,13 +35,27 @@ class ImageClassifierApp:
         tree_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
         tree_scroll = tk.Scrollbar(tree_frame, orient=tk.VERTICAL)
         tree_xscroll = tk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
-        self.tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll.set, xscrollcommand=tree_xscroll.set)
+        self.tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll.set, xscrollcommand=tree_xscroll.set, selectmode="extended")
         tree_scroll.config(command=self.tree.yview)
         tree_xscroll.config(command=self.tree.xview)
         tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         tree_xscroll.pack(side=tk.BOTTOM, fill=tk.X)
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+
+        # Right frame for selected thumbnails with buttons
+        self.right_frame = tk.Frame(main_frame)
+        self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.thumb_canvas = tk.Canvas(self.right_frame)
+        self.thumb_scrollbar = tk.Scrollbar(self.right_frame, orient=tk.VERTICAL, command=self.thumb_canvas.yview)
+        self.thumb_canvas.configure(yscrollcommand=self.thumb_scrollbar.set)
+        self.thumb_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.thumb_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.thumbs_frame = tk.Frame(self.thumb_canvas)
+        self.thumb_canvas.create_window((0,0), window=self.thumbs_frame, anchor="nw")
+        self.thumbs_frame.bind("<Configure>", lambda e: self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all")))
+        self.thumb_imgs = []
+        self.right_frame.pack_forget()  # Hide initially
 
         # Center frame for image and controls
         center_frame = tk.Frame(main_frame)
@@ -49,11 +64,7 @@ class ImageClassifierApp:
         self.img_panel.pack(pady=10)
         self.lbl_result = tk.Label(center_frame, text="", font=("Arial", 14))
         self.lbl_result.pack(pady=5)
-        nav = tk.Frame(center_frame)
-        nav.pack()
-        tk.Button(nav, text="< Prev", command=self.prev_img).pack(side=tk.LEFT)
-        tk.Button(nav, text="Next >", command=self.next_img).pack(side=tk.LEFT)
-    # Removed category buttons as requested
+        # Removed navigation buttons as requested
 
         # Status bar at bottom, full width
         self.status_var = tk.StringVar()
@@ -121,21 +132,67 @@ class ImageClassifierApp:
         selected = self.tree.selection()
         if not selected:
             return
-        item = self.tree.item(selected[0])
-        # Only leaf nodes (images) have 'values'
-        if 'values' in item and item['values']:
-            path = item['values'][0]
-            # Find index in current list
-            if self.image_labels[path] == "people":
-                self.current_list = "people"
-                self.current = self.people_images.index(path)
-            elif self.image_labels[path] == "screenshot":
-                self.current_list = "screenshot"
-                self.current = self.screenshot_images.index(path)
-            else:
-                self.current_list = "all"
-                self.current = self.images.index(path)
-            self.show_img()
+        # Gather all selected image paths
+        selected_paths = []
+        for sel in selected:
+            item = self.tree.item(sel)
+            if 'values' in item and item['values']:
+                selected_paths.append(item['values'][0])
+        if selected_paths:
+            self.show_selected_thumbnails(selected_paths)
+        else:
+            # Fallback to single image view if no images selected
+            item = self.tree.item(selected[0])
+            if 'values' in item and item['values']:
+                path = item['values'][0]
+                if self.image_labels[path] == "people":
+                    self.current_list = "people"
+                    self.current = self.people_images.index(path)
+                elif self.image_labels[path] == "screenshot":
+                    self.current_list = "screenshot"
+                    self.current = self.screenshot_images.index(path)
+                else:
+                    self.current_list = "all"
+                    self.current = self.images.index(path)
+                self.show_img()
+    def show_selected_thumbnails(self, paths):
+        # Clear previous thumbnails
+        for widget in self.thumbs_frame.winfo_children():
+            widget.destroy()
+        self.thumb_imgs.clear()
+        self.img_panel.pack_forget()
+        self.lbl_result.pack_forget()
+        self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.selected_check_vars = []
+        for idx, img_path in enumerate(paths):
+            try:
+                # Use cache if available
+                if img_path in self.image_cache:
+                    img_tk = self.image_cache[img_path]
+                else:
+                    img = Image.open(img_path).resize((120, 90))
+                    img_tk = ImageTk.PhotoImage(img)
+                    self.image_cache[img_path] = img_tk
+                self.thumb_imgs.append(img_tk)
+                frame = tk.Frame(self.thumbs_frame, bd=2, relief=tk.RIDGE)
+                frame.grid(row=idx//3, column=idx%3, padx=8, pady=8)
+                lbl_img = tk.Label(frame, image=img_tk)
+                lbl_img.image = img_tk
+                lbl_img.pack()
+                var = tk.BooleanVar()
+                chk = tk.Checkbutton(frame, text="Select", variable=var, command=lambda v=var, p=img_path: self.on_image_check(v, p))
+                chk.pack(pady=2)
+                self.selected_check_vars.append((var, img_path))
+                lbl_name = tk.Label(frame, text=os.path.basename(img_path), font=("Arial", 9))
+                lbl_name.pack()
+            except Exception:
+                continue
+        self.thumb_canvas.update_idletasks()
+        self.thumb_canvas.yview_moveto(0)
+
+    def on_image_check(self, var, path):
+        if var.get():
+            messagebox.showinfo("Image Selected", f"Selected: {os.path.basename(path)}")
 
     def show_img(self):
         img_list = self.get_current_list()
@@ -145,24 +202,19 @@ class ImageClassifierApp:
             self.lbl_result.config(text="No images in this category.")
             return
         path = img_list[self.current]
-        img = Image.open(path).resize((400, 300))
-        img_tk = ImageTk.PhotoImage(img)
+        # Use cache if available
+        if path in self.image_cache:
+            img_tk = self.image_cache[path]
+        else:
+            img = Image.open(path).resize((400, 300))
+            img_tk = ImageTk.PhotoImage(img)
+            self.image_cache[path] = img_tk
         self.img_panel.config(image=img_tk)
         self.img_panel.image = img_tk
         label, conf, _ = classify_people_vs_screenshot(path)
         self.lbl_result.config(text=f"{os.path.basename(path)}: {label} ({conf:.2f})")
 
-    def next_img(self):
-        img_list = self.get_current_list()
-        if img_list and self.current < len(img_list) - 1:
-            self.current += 1
-            self.show_img()
-
-    def prev_img(self):
-        img_list = self.get_current_list()
-        if img_list and self.current > 0:
-            self.current -= 1
-            self.show_img()
+    # Removed next_img and prev_img methods as requested
 
     def get_current_list(self):
         if self.current_list == "all":
