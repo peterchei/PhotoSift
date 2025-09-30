@@ -1,8 +1,16 @@
-import tkinter as tk
-from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk
+
+# Standard library imports
 import os
+import threading
+
+# Third-party imports
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+from PIL import Image, ImageTk
+
+# Local imports
 from ImageClassification import classify_people_vs_screenshot, IMG_EXT
+from ImageClassification import classify_people_vs_screenshot_batch
 
 class ImageClassifierApp:
     def __init__(self, root):
@@ -58,11 +66,11 @@ class ImageClassifierApp:
         self.right_frame.pack_forget()  # Hide initially
 
         # Center frame for image and controls
-        center_frame = tk.Frame(main_frame)
-        center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.img_panel = tk.Label(center_frame)
+        self.center_frame = tk.Frame(main_frame)
+        self.center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.img_panel = tk.Label(self.center_frame)
         self.img_panel.pack(pady=10)
-        self.lbl_result = tk.Label(center_frame, text="", font=("Arial", 14))
+        self.lbl_result = tk.Label(self.center_frame, text="", font=("Arial", 14))
         self.lbl_result.pack(pady=5)
         # Removed navigation buttons as requested
 
@@ -139,6 +147,7 @@ class ImageClassifierApp:
             if 'values' in item and item['values']:
                 selected_paths.append(item['values'][0])
         if selected_paths:
+            self.center_frame.pack_forget()
             self.show_selected_thumbnails(selected_paths)
         else:
             # Fallback to single image view if no images selected
@@ -154,6 +163,8 @@ class ImageClassifierApp:
                 else:
                     self.current_list = "all"
                     self.current = self.images.index(path)
+                self.right_frame.pack_forget()
+                self.center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
                 self.show_img()
     def show_selected_thumbnails(self, paths):
         # Clear previous thumbnails
@@ -163,16 +174,18 @@ class ImageClassifierApp:
         self.img_panel.pack_forget()
         self.lbl_result.pack_forget()
         self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.center_frame.pack_forget()
         self.selected_check_vars = []
         for idx, img_path in enumerate(paths):
             try:
-                # Use cache if available
-                if img_path in self.image_cache:
-                    img_tk = self.image_cache[img_path]
+                thumb_size = (120, 90)
+                cache_key = (img_path, thumb_size)
+                if cache_key in self.image_cache:
+                    img_tk = self.image_cache[cache_key]
                 else:
-                    img = Image.open(img_path).resize((120, 90))
+                    img = Image.open(img_path).resize(thumb_size)
                     img_tk = ImageTk.PhotoImage(img)
-                    self.image_cache[img_path] = img_tk
+                    self.image_cache[cache_key] = img_tk
                 self.thumb_imgs.append(img_tk)
                 frame = tk.Frame(self.thumbs_frame, bd=2, relief=tk.RIDGE)
                 frame.grid(row=idx//3, column=idx%3, padx=8, pady=8)
@@ -180,11 +193,9 @@ class ImageClassifierApp:
                 lbl_img.image = img_tk
                 lbl_img.pack()
                 var = tk.BooleanVar()
-                chk = tk.Checkbutton(frame, text="Select", variable=var, command=lambda v=var, p=img_path: self.on_image_check(v, p))
+                chk = tk.Checkbutton(frame, text=os.path.basename(img_path), variable=var, command=lambda v=var, p=img_path: self.on_image_check(v, p), font=("Arial", 9))
                 chk.pack(pady=2)
                 self.selected_check_vars.append((var, img_path))
-                lbl_name = tk.Label(frame, text=os.path.basename(img_path), font=("Arial", 9))
-                lbl_name.pack()
             except Exception:
                 continue
         self.thumb_canvas.update_idletasks()
@@ -203,12 +214,14 @@ class ImageClassifierApp:
             return
         path = img_list[self.current]
         # Use cache if available
-        if path in self.image_cache:
-            img_tk = self.image_cache[path]
+        main_size = (400, 300)
+        cache_key = (path, main_size)
+        if cache_key in self.image_cache:
+            img_tk = self.image_cache[cache_key]
         else:
-            img = Image.open(path).resize((400, 300))
+            img = Image.open(path).resize(main_size)
             img_tk = ImageTk.PhotoImage(img)
-            self.image_cache[path] = img_tk
+            self.image_cache[cache_key] = img_tk
         self.img_panel.config(image=img_tk)
         self.img_panel.image = img_tk
         label, conf, _ = classify_people_vs_screenshot(path)
