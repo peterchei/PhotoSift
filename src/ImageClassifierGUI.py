@@ -16,6 +16,7 @@ class ImageClassifierApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Screenshot Identifier")
+        self.root.geometry("800x600")
         self.folder = None
         self.images = []
         self.current = 0
@@ -140,11 +141,14 @@ class ImageClassifierApp:
         selected = self.tree.selection()
         if not selected:
             return
-        # Gather all selected image paths
+        # If Screenshot node is selected, show all screenshot images
         selected_paths = []
         for sel in selected:
             item = self.tree.item(sel)
-            if 'values' in item and item['values']:
+            if item['text'].startswith('Screenshot') and not item['values']:
+                # Screenshot node selected, show all screenshot images
+                selected_paths.extend(self.screenshot_images)
+            elif 'values' in item and item['values']:
                 selected_paths.append(item['values'][0])
         if selected_paths:
             self.center_frame.pack_forget()
@@ -178,7 +182,7 @@ class ImageClassifierApp:
         self.selected_check_vars = []
         for idx, img_path in enumerate(paths):
             try:
-                thumb_size = (120, 90)
+                thumb_size = (240, 180)
                 cache_key = (img_path, thumb_size)
                 if cache_key in self.image_cache:
                     img_tk = self.image_cache[cache_key]
@@ -188,16 +192,26 @@ class ImageClassifierApp:
                     self.image_cache[cache_key] = img_tk
                 self.thumb_imgs.append(img_tk)
                 frame = tk.Frame(self.thumbs_frame, bd=2, relief=tk.RIDGE)
-                frame.grid(row=idx//3, column=idx%3, padx=8, pady=8)
+                frame.grid(row=idx//5, column=idx%5, padx=8, pady=8)
                 lbl_img = tk.Label(frame, image=img_tk)
                 lbl_img.image = img_tk
                 lbl_img.pack()
+                lbl_img.bind('<Double-Button-1>', lambda e, p=img_path: self.open_full_image(p))
                 var = tk.BooleanVar()
                 chk = tk.Checkbutton(frame, text=os.path.basename(img_path), variable=var, command=lambda v=var, p=img_path: self.on_image_check(v, p), font=("Arial", 9))
                 chk.pack(pady=2)
                 self.selected_check_vars.append((var, img_path))
             except Exception:
                 continue
+
+    def open_full_image(self, img_path):
+        top = tk.Toplevel(self.root)
+        top.title(os.path.basename(img_path))
+        img = Image.open(img_path)
+        img_tk = ImageTk.PhotoImage(img)
+        lbl = tk.Label(top, image=img_tk)
+        lbl.image = img_tk
+        lbl.pack()
         self.thumb_canvas.update_idletasks()
         self.thumb_canvas.yview_moveto(0)
 
@@ -214,7 +228,7 @@ class ImageClassifierApp:
             return
         path = img_list[self.current]
         # Use cache if available
-        main_size = (400, 300)
+        main_size = (800, 600)
         cache_key = (path, main_size)
         if cache_key in self.image_cache:
             img_tk = self.image_cache[cache_key]
