@@ -13,6 +13,12 @@ from ImageClassification import classify_people_vs_screenshot, IMG_EXT
 from ImageClassification import classify_people_vs_screenshot_batch
 
 class ImageClassifierApp:
+    def select_all_photos(self):
+        # Select all checkboxes in the current thumbnail view
+        if hasattr(self, 'selected_check_vars'):
+            for var, _ in self.selected_check_vars:
+                var.set(True)
+            self.update_clean_btn_label(self.count_selected_photos())
     def __init__(self, root):
         self.root = root
         self.root.title("Screenshot Identifier")
@@ -77,6 +83,18 @@ class ImageClassifierApp:
         # Right frame for selected thumbnails with buttons (inside card)
         self.right_frame = tk.Frame(card, bg="#ffffff")
         self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Clean button frame (right side)
+        clean_btn_frame = tk.Frame(self.right_frame, bg="#ffffff")
+        clean_btn_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 8), pady=10)
+        # Select All button
+        self.select_all_btn = tk.Button(clean_btn_frame, text="Select All", font=("Segoe UI", 11, "bold"), bg="#64b5f6", fg="white", activebackground="#1976d2", activeforeground="white", bd=0, relief=tk.FLAT, padx=18, pady=8, cursor="hand2", command=self.select_all_photos)
+        self.select_all_btn.pack(side=tk.TOP, anchor="ne", pady=(10, 8))
+
+        self.clean_btn_var = tk.StringVar()
+        self.clean_btn_var.set("Clean (0)")
+        self.clean_btn = tk.Button(clean_btn_frame, textvariable=self.clean_btn_var, font=("Segoe UI", 11, "bold"), bg="#e57373", fg="white", activebackground="#c62828", activeforeground="white", bd=0, relief=tk.FLAT, padx=18, pady=8, cursor="hand2", command=self.clean_selected_photos)
+        self.clean_btn.pack(side=tk.TOP, anchor="ne", pady=(0,0))
+
         self.thumb_canvas = tk.Canvas(self.right_frame, bg="#ffffff", highlightthickness=0)
         self.thumb_scrollbar = tk.Scrollbar(self.right_frame, orient=tk.VERTICAL, command=self.thumb_canvas.yview)
         self.thumb_canvas.configure(yscrollcommand=self.thumb_scrollbar.set)
@@ -199,8 +217,10 @@ class ImageClassifierApp:
         self.img_panel.pack_forget()
         self.lbl_result.pack_forget()
         self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
         self.center_frame.pack_forget()
         self.selected_check_vars = []
+        self.update_clean_btn_label(0)
         for idx, img_path in enumerate(paths):
             try:
                 thumb_size = (240, 180)
@@ -222,8 +242,22 @@ class ImageClassifierApp:
                 chk = tk.Checkbutton(frame, text=os.path.basename(img_path), variable=var, command=lambda v=var, p=img_path: self.on_image_check(v, p), font=("Arial", 9))
                 chk.pack(pady=2)
                 self.selected_check_vars.append((var, img_path))
+                var.trace_add('write', lambda *args: self.update_clean_btn_label(self.count_selected_photos()))
             except Exception:
                 continue
+        self.thumb_canvas.update_idletasks()
+        self.thumb_canvas.yview_moveto(0)
+
+    def count_selected_photos(self):
+        return sum(var.get() for var, _ in self.selected_check_vars)
+
+    def update_clean_btn_label(self, count):
+        self.clean_btn_var.set(f"Clean ({count})")
+
+    def clean_selected_photos(self):
+        # Placeholder for clean action
+        selected = [img_path for var, img_path in self.selected_check_vars if var.get()]
+        messagebox.showinfo("Clean", f"You selected {len(selected)} photo(s) to clean.\nPaths: {selected}")
 
     def open_full_image(self, img_path):
         top = tk.Toplevel(self.root)
