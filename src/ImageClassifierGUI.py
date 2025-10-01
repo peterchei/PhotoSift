@@ -28,20 +28,38 @@ class ImageClassifierApp:
 
     def setup_ui(self):
         import tkinter.ttk as ttk
+        self.root.configure(bg="#f3f6fa")
+
+        # Header with gradient effect (simulated)
+        header = tk.Canvas(self.root, height=54, bg="#2d3e50", highlightthickness=0)
+        header.pack(fill=tk.X)
+        header.create_rectangle(0, 0, 2000, 54, fill="#2d3e50", outline="")
+        header.create_rectangle(0, 0, 2000, 27, fill="#3a4a63", outline="")
+        header.create_text(30, 27, anchor="w", text="PhotoSift - Screenshot Identifier", font=("Segoe UI", 20, "bold"), fill="white")
+
         # Top frame for folder selection
-        frm = tk.Frame(self.root)
-        frm.pack(fill=tk.X, padx=10, pady=5)
-        tk.Button(frm, text="Select Folder", command=self.select_folder).pack(side=tk.LEFT)
-        self.lbl_folder = tk.Label(frm, text="No folder selected")
+        frm = tk.Frame(self.root, bg="#f3f6fa")
+        frm.pack(fill=tk.X, padx=18, pady=(10, 14))
+        style_btn = {"font": ("Segoe UI", 11), "bg": "#e0e6ef", "activebackground": "#d0d7e6", "bd": 0, "relief": tk.FLAT, "cursor": "hand2"}
+        btn = tk.Button(frm, text="Select Folder", command=self.select_folder, **style_btn)
+        btn.pack(side=tk.LEFT, padx=(0, 12))
+        btn.bind("<Enter>", lambda e: btn.config(bg="#d0d7e6"))
+        btn.bind("<Leave>", lambda e: btn.config(bg="#e0e6ef"))
+        self.lbl_folder = tk.Label(frm, text="No folder selected", bg="#f3f6fa", font=("Segoe UI", 11, "italic"), fg="#555")
         self.lbl_folder.pack(side=tk.LEFT, padx=10)
 
         # Main frame for tree and image
-        main_frame = tk.Frame(self.root)
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = tk.Frame(self.root, bg="#f3f6fa")
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=8)
 
-        # Treeview with vertical scrollbar on left
-        tree_frame = tk.Frame(main_frame)
-        tree_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
+        # Sidebar (Treeview) with fixed width and shadow effect
+        sidebar = tk.Frame(main_frame, bg="#e9ecf2", width=210, height=480, bd=0, highlightbackground="#b0b6c6", highlightthickness=2)
+        sidebar.pack_propagate(False)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 18), pady=4)
+        tree_label = tk.Label(sidebar, text="Categories", bg="#e9ecf2", font=("Segoe UI", 12, "bold"), anchor="w")
+        tree_label.pack(fill=tk.X, padx=10, pady=(12, 4))
+        tree_frame = tk.Frame(sidebar, bg="#e9ecf2")
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 10))
         tree_scroll = tk.Scrollbar(tree_frame, orient=tk.VERTICAL)
         tree_xscroll = tk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
         self.tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll.set, xscrollcommand=tree_xscroll.set, selectmode="extended")
@@ -52,33 +70,36 @@ class ImageClassifierApp:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
 
-        # Right frame for selected thumbnails with buttons
-        self.right_frame = tk.Frame(main_frame)
+        # Card-like main content area with shadow
+        card = tk.Frame(main_frame, bg="#ffffff", bd=0, highlightbackground="#b0b6c6", highlightthickness=2)
+        card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 0), pady=0)
+
+        # Right frame for selected thumbnails with buttons (inside card)
+        self.right_frame = tk.Frame(card, bg="#ffffff")
         self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.thumb_canvas = tk.Canvas(self.right_frame)
+        self.thumb_canvas = tk.Canvas(self.right_frame, bg="#ffffff", highlightthickness=0)
         self.thumb_scrollbar = tk.Scrollbar(self.right_frame, orient=tk.VERTICAL, command=self.thumb_canvas.yview)
         self.thumb_canvas.configure(yscrollcommand=self.thumb_scrollbar.set)
         self.thumb_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.thumb_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.thumbs_frame = tk.Frame(self.thumb_canvas)
+        self.thumb_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8), pady=10)
+        self.thumbs_frame = tk.Frame(self.thumb_canvas, bg="#ffffff")
         self.thumb_canvas.create_window((0,0), window=self.thumbs_frame, anchor="nw")
         self.thumbs_frame.bind("<Configure>", lambda e: self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all")))
         self.thumb_imgs = []
         self.right_frame.pack_forget()  # Hide initially
 
-        # Center frame for image and controls
-        self.center_frame = tk.Frame(main_frame)
+        # Center frame for image and controls (inside card)
+        self.center_frame = tk.Frame(card, bg="#ffffff")
         self.center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.img_panel = tk.Label(self.center_frame)
-        self.img_panel.pack(pady=10)
-        self.lbl_result = tk.Label(self.center_frame, text="", font=("Arial", 14))
-        self.lbl_result.pack(pady=5)
-        # Removed navigation buttons as requested
+        self.img_panel = tk.Label(self.center_frame, bg="#ffffff")
+        self.img_panel.pack(pady=(40, 12))
+        self.lbl_result = tk.Label(self.center_frame, text="", font=("Segoe UI", 16, "bold"), bg="#ffffff", fg="#2d3e50")
+        self.lbl_result.pack(pady=8)
 
         # Status bar at bottom, full width
         self.status_var = tk.StringVar()
         self.status_var.set("")
-        self.status_bar = tk.Label(self.root, textvariable=self.status_var, bd=1, relief=tk.SUNKEN, anchor=tk.W, bg="#f0f0f0")
+        self.status_bar = tk.Label(self.root, textvariable=self.status_var, bd=0, relief=tk.FLAT, anchor=tk.W, bg="#3a4a63", fg="white", font=("Segoe UI", 10))
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
     def select_folder(self):
