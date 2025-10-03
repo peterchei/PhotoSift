@@ -30,6 +30,10 @@ class ImageClassifierApp:
         self.screenshot_images = []
         self.current_list = "all"  # can be "all", "people", "screenshot"
         self.image_cache = {}  # path -> PhotoImage
+        # Paging variables
+        self.page_size = 50  # images per page
+        self.current_page = 0
+        self.current_paths = []
         self.setup_ui()
 
     def setup_ui(self):
@@ -107,6 +111,25 @@ class ImageClassifierApp:
         self.clean_btn.bind("<Enter>", lambda e: self.clean_btn.config(bg="#ffd6c0"))
         self.clean_btn.bind("<Leave>", lambda e: self.clean_btn.config(bg="#ffb4a2"))
 
+        # Page navigation controls
+        self.page_frame = tk.Frame(self.right_frame, bg="#f9fafb")
+        self.page_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 0))
+        
+        nav_btn_style = {"font": ("Segoe UI", 11), "bg": "#e0e6ef", "fg": "#3a4a63",
+                         "activebackground": "#d0d7e6", "activeforeground": "#3a4a63",
+                         "bd": 0, "padx": 15, "pady": 5, "cursor": "hand2"}
+        
+        self.prev_page_btn = tk.Button(self.page_frame, text="← Previous", command=self.prev_page, **nav_btn_style)
+        self.prev_page_btn.pack(side=tk.LEFT)
+        
+        self.page_label = tk.Label(self.page_frame, text="Page 1", font=("Segoe UI", 11), bg="#f9fafb", fg="#3a4a63")
+        self.page_label.pack(side=tk.LEFT, padx=20)
+        
+        self.next_page_btn = tk.Button(self.page_frame, text="Next →", command=self.next_page, **nav_btn_style)
+        self.next_page_btn.pack(side=tk.LEFT)
+        
+        self.page_frame.pack_forget()  # Hide initially
+        
         self.thumb_canvas = tk.Canvas(self.right_frame, bg="#f9fafb", highlightthickness=0, bd=0)
         self.thumb_scrollbar = tk.Scrollbar(self.right_frame, orient=tk.VERTICAL, command=self.thumb_canvas.yview)
         self.thumb_canvas.configure(yscrollcommand=self.thumb_scrollbar.set)
@@ -278,6 +301,7 @@ class ImageClassifierApp:
                 selected_paths.append(item['values'][0])
         if selected_paths:
             self.center_frame.pack_forget()
+            self.current_page = 0  # Reset to first page
             self.show_selected_thumbnails(selected_paths)
         else:
             # Fallback to single image view if no images selected
@@ -296,7 +320,23 @@ class ImageClassifierApp:
                 self.right_frame.pack_forget()
                 self.center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
                 self.show_img()
-    def show_selected_thumbnails(self, paths):
+    def next_page(self):
+        if (self.current_page + 1) * self.page_size < len(self.current_paths):
+            self.current_page += 1
+            self.show_selected_thumbnails(self.current_paths, force_page=True)
+    
+    def prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.show_selected_thumbnails(self.current_paths, force_page=True)
+    
+    def update_page_controls(self):
+        total_pages = max(1, (len(self.current_paths) - 1) // self.page_size + 1)
+        self.page_label.config(text=f"Page {self.current_page + 1} of {total_pages}")
+        self.prev_page_btn.config(state=tk.NORMAL if self.current_page > 0 else tk.DISABLED)
+        self.next_page_btn.config(state=tk.NORMAL if (self.current_page + 1) * self.page_size < len(self.current_paths) else tk.DISABLED)
+    
+    def show_selected_thumbnails(self, paths, force_page=False):
         # Clear previous thumbnails
         for widget in self.thumbs_frame.winfo_children():
             widget.destroy()
@@ -304,11 +344,27 @@ class ImageClassifierApp:
         self.img_panel.pack_forget()
         self.lbl_result.pack_forget()
         self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.page_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 0))
 
         self.center_frame.pack_forget()
         self.selected_check_vars = []
         self.update_clean_btn_label(0)
-        for idx, img_path in enumerate(paths):
+        
+        # Update paths and reset page if needed
+        if not force_page:
+            self.current_paths = paths
+            self.current_page = 0
+        
+        # Calculate page slice
+        start_idx = self.current_page * self.page_size
+        end_idx = min(start_idx + self.page_size, len(self.current_paths))
+        page_paths = self.current_paths[start_idx:end_idx]
+        
+        # Update navigation controls
+        self.update_page_controls()
+        
+        # Show thumbnails for current page
+        for idx, img_path in enumerate(page_paths):
             try:
                 thumb_size = (240, 180)
                 cache_key = (img_path, thumb_size)
