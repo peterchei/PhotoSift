@@ -132,6 +132,56 @@ class ImageClassifierApp:
         self.status_bar = tk.Label(self.root, textvariable=self.status_var, bd=0, relief=tk.FLAT, anchor=tk.W, bg="#c7d6f7", fg="#3a4a63", font=("Segoe UI", 11))
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(0,2))
 
+    def show_progress_window(self, total):
+        # Create progress window
+        self.progress_window = tk.Toplevel(self.root)
+        self.progress_window.title("Processing Images")
+        self.progress_window.geometry("400x150")
+        self.progress_window.transient(self.root)
+        self.progress_window.grab_set()
+        
+        # Center the progress window
+        window_width = 400
+        window_height = 150
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        self.progress_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        
+        # Configure progress window
+        self.progress_window.configure(bg="#f7fafc")
+        frame = tk.Frame(self.progress_window, bg="#f7fafc", padx=20, pady=20)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Progress label
+        self.progress_label = tk.Label(frame, text="Initializing...", font=("Segoe UI", 11), bg="#f7fafc")
+        self.progress_label.pack(pady=(0, 10))
+        
+        # Progress bar
+        self.progress_var = tk.DoubleVar()
+        style = ttk.Style()
+        style.configure("Custom.Horizontal.TProgressbar", thickness=15, background='#3399ff')
+        self.progress_bar = ttk.Progressbar(frame, style="Custom.Horizontal.TProgressbar", 
+                                          length=360, mode='determinate', 
+                                          maximum=total, variable=self.progress_var)
+        self.progress_bar.pack(pady=(0, 10))
+        
+        # Detailed status
+        self.progress_detail = tk.Label(frame, text="", font=("Segoe UI", 10), bg="#f7fafc", fg="#666666")
+        self.progress_detail.pack()
+
+    def update_progress(self, current, total, status_text, detail_text):
+        if hasattr(self, 'progress_window') and self.progress_window.winfo_exists():
+            self.progress_var.set(current)
+            self.progress_label.config(text=status_text)
+            self.progress_detail.config(text=detail_text)
+            self.progress_window.update_idletasks()
+
+    def close_progress(self):
+        if hasattr(self, 'progress_window') and self.progress_window.winfo_exists():
+            self.progress_window.destroy()
+
     def select_folder(self):
         folder = filedialog.askdirectory()
         if folder:
@@ -143,21 +193,30 @@ class ImageClassifierApp:
             self.screenshot_images = []
             self.image_labels = {}  # path -> label
             total = len(self.images)
+            
+            # Show progress window
+            self.root.after(0, self.show_progress_window, total)
             self.status_bar.config(bg="#3399ff", fg="white")
             self.status_var.set(f"Processing 0/{total} images (0%)...")
             self.root.update_idletasks()
 
-            import threading
             def process_images():
                 from ImageClassification import classify_people_vs_screenshot_batch
                 batch_size = 64  # Increase batch size for better GPU utilization
+                processed = 0
+                
                 for start in range(0, total, batch_size):
                     end = min(start + batch_size, total)
                     batch_paths = self.images[start:end]
                     percent = int((end/total)*100) if total else 100
-                    print(f"[LOG] Processing images {start+1}-{end}/{total} ({percent}%)")
+                    status_text = f"Processing images... ({percent}%)"
+                    detail_text = f"Processing {start+1}-{end} of {total} images"
+                    
+                    # Update both progress window and status bar
+                    self.root.after(0, self.update_progress, end, total, status_text, detail_text)
                     self.root.after(0, self.status_var.set, f"Processing images {start+1}-{end}/{total} ({percent}%)")
                     self.root.after(0, self.status_bar.config, {"bg": "#3399ff", "fg": "white"})
+                    
                     batch_results = classify_people_vs_screenshot_batch(batch_paths)
                     for p, result in zip(batch_paths, batch_results):
                         if result is None:
@@ -169,10 +228,18 @@ class ImageClassifierApp:
                             self.people_images.append(p)
                         elif label == "screenshot":
                             self.screenshot_images.append(p)
+                    
+                    processed += len(batch_paths)
+                
+                # Processing complete
                 people_count = len(self.people_images)
                 screenshot_count = len(self.screenshot_images)
+                final_status = f"Completed! Found {people_count} people and {screenshot_count} screenshots"
+                self.root.after(0, self.update_progress, total, total, "Processing Complete!", final_status)
                 self.root.after(0, self.status_var.set, f"Done processing {total} images. (100%) | People: {people_count} | Screenshot: {screenshot_count}")
                 self.root.after(0, self.status_bar.config, {"bg": "#33cc33", "fg": "white"})
+                
+                # Update UI
                 self.current = 0
                 self.current_list = "all"
                 self.root.after(0, self.populate_tree)
@@ -180,6 +247,10 @@ class ImageClassifierApp:
                     self.root.after(0, self.show_img)
                 else:
                     self.root.after(0, lambda: messagebox.showinfo("No Images", "No images found in folder."))
+                
+                # Close progress window after a short delay
+                self.root.after(1500, self.close_progress)
+                
             threading.Thread(target=process_images, daemon=True).start()
 
     def populate_tree(self):
