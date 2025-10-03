@@ -30,6 +30,7 @@ class ImageClassifierApp:
         self.screenshot_images = []
         self.current_list = "all"  # can be "all", "people", "screenshot"
         self.image_cache = {}  # path -> PhotoImage
+        self.confidence_scores = {}  # path -> confidence score
         # Paging variables
         self.page_size = 50  # images per page
         self.current_page = 0
@@ -130,11 +131,47 @@ class ImageClassifierApp:
         
         self.page_frame.pack_forget()  # Hide initially
         
-        self.thumb_canvas = tk.Canvas(self.right_frame, bg="#f9fafb", highlightthickness=0, bd=0)
-        self.thumb_scrollbar = tk.Scrollbar(self.right_frame, orient=tk.VERTICAL, command=self.thumb_canvas.yview)
+        # Main container for page controls and thumbnails
+        self.content_frame = tk.Frame(self.right_frame, bg="#f9fafb")
+        self.content_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Page navigation controls - centered at top
+        self.page_frame = tk.Frame(self.content_frame, bg="#f9fafb")
+        self.page_frame.pack(fill=tk.X, padx=10, pady=(10, 20))
+        
+        # Center container for navigation
+        nav_center = tk.Frame(self.page_frame, bg="#f9fafb")
+        nav_center.pack(expand=True, fill=tk.X)
+        
+        # Create a nested frame for the buttons to ensure center alignment
+        nav_buttons = tk.Frame(nav_center, bg="#f9fafb")
+        nav_buttons.pack(expand=True, anchor="center")
+        
+        nav_btn_style = {"font": ("Segoe UI", 11), "bg": "#e0e6ef", "fg": "#3a4a63",
+                         "activebackground": "#d0d7e6", "activeforeground": "#3a4a63",
+                         "bd": 0, "padx": 15, "pady": 5, "cursor": "hand2"}
+        
+        self.prev_page_btn = tk.Button(nav_buttons, text="\u2190 Previous", command=self.prev_page, **nav_btn_style)
+        self.prev_page_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        self.page_label = tk.Label(nav_buttons, text="Page 1", font=("Segoe UI", 11), bg="#f9fafb", fg="#3a4a63")
+        self.page_label.pack(side=tk.LEFT, padx=20)
+        
+        self.next_page_btn = tk.Button(nav_buttons, text="Next \u2192", command=self.next_page, **nav_btn_style)
+        self.next_page_btn.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Thumbnail container
+        self.thumb_container = tk.Frame(self.content_frame, bg="#f9fafb")
+        self.thumb_container.pack(fill=tk.BOTH, expand=True, padx=10)
+        
+        # Thumbnail canvas and scrollbar
+        self.thumb_canvas = tk.Canvas(self.thumb_container, bg="#f9fafb", highlightthickness=0, bd=0)
+        self.thumb_scrollbar = tk.Scrollbar(self.thumb_container, orient=tk.VERTICAL, command=self.thumb_canvas.yview)
         self.thumb_canvas.configure(yscrollcommand=self.thumb_scrollbar.set)
         self.thumb_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.thumb_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10), pady=14)
+        self.thumb_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        self.content_frame.pack_forget()  # Hide initially
         self.thumbs_frame = tk.Frame(self.thumb_canvas, bg="#f9fafb")
         self.thumb_canvas.create_window((0,0), window=self.thumbs_frame, anchor="nw")
         self.thumbs_frame.bind("<Configure>", lambda e: self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all")))
@@ -247,10 +284,15 @@ class ImageClassifierApp:
                             continue
                         label, conf, _ = result
                         self.image_labels[p] = label
+                        self.confidence_scores[p] = conf
                         if label == "people":
                             self.people_images.append(p)
                         elif label == "screenshot":
                             self.screenshot_images.append(p)
+                    
+                    # Sort the lists by confidence score
+                    self.people_images.sort(key=lambda x: self.confidence_scores[x], reverse=True)
+                    self.screenshot_images.sort(key=lambda x: self.confidence_scores[x], reverse=True)
                     
                     processed += len(batch_paths)
                 
@@ -344,7 +386,7 @@ class ImageClassifierApp:
         self.img_panel.pack_forget()
         self.lbl_result.pack_forget()
         self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.page_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 0))
+        self.content_frame.pack(fill=tk.BOTH, expand=True)  # Show the main content frame
 
         self.center_frame.pack_forget()
         self.selected_check_vars = []
@@ -355,6 +397,12 @@ class ImageClassifierApp:
             self.current_paths = paths
             self.current_page = 0
         
+        # Sort paths by confidence score if they are from a category
+        category_paths = self.current_paths
+        if category_paths and category_paths[0] in self.confidence_scores:
+            category_paths = sorted(category_paths, key=lambda x: self.confidence_scores[x], reverse=True)
+            self.current_paths = category_paths
+
         # Calculate page slice
         start_idx = self.current_page * self.page_size
         end_idx = min(start_idx + self.page_size, len(self.current_paths))
@@ -392,8 +440,23 @@ class ImageClassifierApp:
                 lbl_img.bind("<Enter>", on_enter)
                 lbl_img.bind("<Leave>", on_leave)
                 var = tk.BooleanVar()
-                chk = tk.Checkbutton(frame, text=os.path.basename(img_path), variable=var, command=lambda v=var, p=img_path: self.on_image_check(v, p), font=("Arial", 10), bg="#f9fafb", activebackground="#e3eafc", selectcolor="#a5d8fa", bd=0, highlightthickness=0)
-                chk.pack(pady=4)
+                # Create frame for text (filename and confidence)
+                text_frame = tk.Frame(frame, bg="#f9fafb")
+                text_frame.pack(fill=tk.X, pady=4)
+                
+                # Filename checkbox
+                chk = tk.Checkbutton(text_frame, text=os.path.basename(img_path), variable=var, 
+                                   command=lambda v=var, p=img_path: self.on_image_check(v, p), 
+                                   font=("Arial", 10), bg="#f9fafb", activebackground="#e3eafc", 
+                                   selectcolor="#a5d8fa", bd=0, highlightthickness=0)
+                chk.pack(side=tk.LEFT)
+                
+                # Confidence score if available
+                if img_path in self.confidence_scores:
+                    conf_text = f"{self.confidence_scores[img_path]:.2f}"
+                    conf_label = tk.Label(text_frame, text=conf_text, font=("Arial", 9), 
+                                        bg="#f9fafb", fg="#666666")
+                    conf_label.pack(side=tk.RIGHT, padx=4)
                 self.selected_check_vars.append((var, img_path))
                 var.trace_add('write', lambda *args: self.update_clean_btn_label(self.count_selected_photos()))
             except Exception:
