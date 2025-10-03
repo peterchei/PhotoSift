@@ -28,21 +28,30 @@ def classify_people_vs_screenshot(path: str):
 
 def _load_image(path):
     from PIL import Image
-    img = Image.open(path).convert("RGB")
-    img = img.resize((224, 224), Image.BICUBIC)
-    return img
+    try:
+        img = Image.open(path).convert("RGB")
+        img = img.resize((224, 224), Image.BICUBIC)
+        return img
+    except Exception as e:
+        print(f"[WARN] Failed to load image: {path} ({e})")
+        return None
 
 def classify_people_vs_screenshot_batch(paths):
     # Parallel image loading
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=8) as executor:
         images = list(executor.map(_load_image, paths))
+    # Filter out failed images (None)
+    valid = [(img, path) for img, path in zip(images, paths) if img is not None]
+    if not valid:
+        return []
+    images, valid_paths = zip(*valid)
     texts, owners = [], []
     for lbl, prompts in LABELS.items():
         for p in prompts:
             texts.append(p)
             owners.append(lbl)
-    inputs = processor(text=texts, images=images, return_tensors="pt", padding=True)
+    inputs = processor(text=texts, images=list(images), return_tensors="pt", padding=True)
     inputs = {k: v.to(device) for k, v in inputs.items()}
     with torch.inference_mode(), torch.autocast(device_type="cuda", dtype=torch.float16, enabled=(device=="cuda")):
         out = model(**inputs).logits_per_image  # [batch, num_prompts]
@@ -53,7 +62,21 @@ def classify_people_vs_screenshot_batch(paths):
         scores = {lbl: float(prob[owners == lbl].sum()) for lbl in LABELS}
         pred = max(scores, key=scores.get)
         results.append((pred, scores[pred], scores))
-    return results
+    # Map results back to original paths, fill skipped with None
+    out_results = []
+    valid_iter = iter(results)
+    for img, path in zip(images, valid_paths):
+        out_results.append(next(valid_iter))
+    # For skipped images, return None
+    final_results = []
+    valid_idx = 0
+    for orig_path in paths:
+        if valid_idx < len(valid_paths) and orig_path == valid_paths[valid_idx]:
+            final_results.append(out_results[valid_idx])
+            valid_idx += 1
+        else:
+            final_results.append(None)
+    return final_results
 
 
 
