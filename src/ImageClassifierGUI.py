@@ -14,11 +14,121 @@ from ImageClassification import classify_people_vs_screenshot_batch
 
 class ImageClassifierApp:
     def select_all_photos(self):
-        # Select all checkboxes in the current thumbnail view
-        if hasattr(self, 'selected_check_vars'):
-            for var, _ in self.selected_check_vars:
-                var.set(True)
-            self.update_clean_btn_label(self.count_selected_photos())
+        if not hasattr(self, 'selected_check_vars') or not self.selected_check_vars:
+            return
+            
+        # Get current state from first checkbox to determine action
+        first_var = self.selected_check_vars[0][0]
+        new_state = not first_var.get()
+        
+        # Update all checkboxes
+        for var, _ in self.selected_check_vars:
+            var.set(new_state)
+            
+        # Update clean button label
+        self.update_clean_btn_label(self.count_selected_photos())
+
+    def show_selected_thumbnails(self, paths, force_page=False):
+        # Use wait cursor during update
+        self.root.config(cursor="wait")
+        self.thumbs_frame.config(cursor="watch")
+        
+        # Clear previous thumbnails quickly
+        for widget in self.thumbs_frame.winfo_children():
+            widget.destroy()
+        self.thumb_imgs.clear()
+        self.img_panel.pack_forget()
+        self.lbl_result.pack_forget()
+        self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.content_frame.pack(fill=tk.BOTH, expand=True)  # Show the main content frame
+        
+        # Update paths and reset page if needed
+        if not force_page:
+            self.current_paths = paths
+            self.current_page = 0
+        
+        # Sort paths by confidence score if they are from a category
+        category_paths = self.current_paths
+        if category_paths and category_paths[0] in self.confidence_scores:
+            category_paths = sorted(category_paths, key=lambda x: self.confidence_scores[x], reverse=True)
+            self.current_paths = category_paths
+
+        # Calculate page slice
+        start_idx = self.current_page * self.page_size
+        end_idx = min(start_idx + self.page_size, len(self.current_paths))
+        page_paths = self.current_paths[start_idx:end_idx]
+        
+        # Update navigation controls
+        self.update_page_controls()
+        
+        # Show thumbnails for current page
+        self.selected_check_vars = []
+        for idx, img_path in enumerate(page_paths):
+            try:
+                thumb_size = (240, 180)
+                cache_key = (img_path, thumb_size)
+                if cache_key in self.image_cache:
+                    img_tk = self.image_cache[cache_key]
+                else:
+                    img = Image.open(img_path).resize(thumb_size)
+                    img_tk = ImageTk.PhotoImage(img)
+                    self.image_cache[cache_key] = img_tk
+                self.thumb_imgs.append(img_tk)
+                
+                # Create frame with simple shadow
+                frame = tk.Frame(self.thumbs_frame, bd=0, bg="#f9fafb", highlightbackground="#e0e6ef", highlightthickness=2)
+                frame.grid(row=idx//5, column=idx%5, padx=12, pady=12)
+                
+                # Simple shadow effect
+                shadow_frame = tk.Frame(frame, bg="#e0e6ef", width=240, height=180)
+                shadow_frame.place(x=4, y=4)
+                
+                lbl_img = tk.Label(frame, image=img_tk, bg="#f9fafb")
+                lbl_img.image = img_tk
+                lbl_img.pack()
+                lbl_img.bind('<Double-Button-1>', lambda e, p=img_path: self.open_full_image(p))
+                
+                # Simple hover effects
+                def on_enter(ev, f=frame, s=shadow_frame):
+                    f.config(bg="#e3eafc", highlightbackground="#a5d8fa")
+                    s.place(x=2, y=2)
+                def on_leave(ev, f=frame, s=shadow_frame):
+                    f.config(bg="#f9fafb", highlightbackground="#e0e6ef")
+                    s.place(x=4, y=4)
+                
+                frame.bind("<Enter>", on_enter)
+                frame.bind("<Leave>", on_leave)
+                lbl_img.bind("<Enter>", on_enter)
+                lbl_img.bind("<Leave>", on_leave)
+                
+                # Text frame for filename and confidence
+                text_frame = tk.Frame(frame, bg="#f9fafb")
+                text_frame.pack(fill=tk.X, pady=4)
+                
+                var = tk.BooleanVar()
+                chk = tk.Checkbutton(text_frame, text=os.path.basename(img_path), variable=var,
+                                   command=lambda v=var, p=img_path: self.on_image_check(v, p),
+                                   font=("Arial", 10), bg="#f9fafb", activebackground="#e3eafc",
+                                   selectcolor="#a5d8fa", bd=0, highlightthickness=0)
+                chk.pack(side=tk.LEFT)
+                
+                if img_path in self.confidence_scores:
+                    conf_text = f"{self.confidence_scores[img_path]:.2f}"
+                    conf_label = tk.Label(text_frame, text=conf_text, font=("Arial", 9),
+                                        bg="#f9fafb", fg="#666666")
+                    conf_label.pack(side=tk.RIGHT, padx=4)
+                
+                self.selected_check_vars.append((var, img_path))
+                var.trace_add('write', lambda *args: self.update_clean_btn_label(self.count_selected_photos()))
+            except Exception as e:
+                print(f"Error loading thumbnail: {e}")
+                continue
+        
+        # Reset cursor and update view
+        self.root.config(cursor="")
+        self.thumbs_frame.config(cursor="")
+        self.thumb_canvas.update_idletasks()
+        self.thumb_canvas.yview_moveto(0)
     def __init__(self, root):
         self.root = root
         self.root.title("Screenshot Identifier")
@@ -362,24 +472,74 @@ class ImageClassifierApp:
                 self.right_frame.pack_forget()
                 self.center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
                 self.show_img()
+    def animate_button_click(self, button):
+        # Quick visual feedback without delays
+        button.config(bg="#a5d8fa", fg="#ffffff")
+        self.root.after(50, lambda: button.config(bg="#e0e6ef", fg="#3a4a63"))
+    
     def next_page(self):
-        if (self.current_page + 1) * self.page_size < len(self.current_paths):
-            self.current_page += 1
-            self.show_selected_thumbnails(self.current_paths, force_page=True)
+        if not hasattr(self, 'current_paths') or not self.current_paths:
+            return
+        
+        next_page = self.current_page + 1
+        if next_page * self.page_size < len(self.current_paths):
+            self.current_page = next_page
+            # Disable buttons during update to prevent rapid clicks
+            self.prev_page_btn.config(state=tk.DISABLED)
+            self.next_page_btn.config(state=tk.DISABLED)
+            self.root.after(1, lambda: self.show_selected_thumbnails(self.current_paths, force_page=True))
     
     def prev_page(self):
+        if not hasattr(self, 'current_paths') or not self.current_paths:
+            return
+            
         if self.current_page > 0:
             self.current_page -= 1
-            self.show_selected_thumbnails(self.current_paths, force_page=True)
+            # Disable buttons during update to prevent rapid clicks
+            self.prev_page_btn.config(state=tk.DISABLED)
+            self.next_page_btn.config(state=tk.DISABLED)
+            self.root.after(1, lambda: self.show_selected_thumbnails(self.current_paths, force_page=True))
     
     def update_page_controls(self):
+        if not hasattr(self, 'current_paths') or not self.current_paths:
+            self.page_label.config(text="Page 0 of 0")
+            self.prev_page_btn.config(state=tk.DISABLED)
+            self.next_page_btn.config(state=tk.DISABLED)
+            return
+            
         total_pages = max(1, (len(self.current_paths) - 1) // self.page_size + 1)
         self.page_label.config(text=f"Page {self.current_page + 1} of {total_pages}")
+        
+        # Update button states
         self.prev_page_btn.config(state=tk.NORMAL if self.current_page > 0 else tk.DISABLED)
-        self.next_page_btn.config(state=tk.NORMAL if (self.current_page + 1) * self.page_size < len(self.current_paths) else tk.DISABLED)
+        next_enabled = (self.current_page + 1) * self.page_size < len(self.current_paths)
+        self.next_page_btn.config(state=tk.NORMAL if next_enabled else tk.DISABLED)
+    
+    def animate_fade(self, widget, start_alpha, end_alpha, steps=10, interval=20):
+        # Helper function for fade animation
+        current = float(start_alpha)
+        step = (float(end_alpha) - float(start_alpha)) / steps
+        
+        def update_alpha():
+            nonlocal current
+            current += step
+            if (step > 0 and current <= float(end_alpha)) or (step < 0 and current >= float(end_alpha)):
+                widget.configure(bg=self.blend_colors("#f9fafb", "#ffffff", current))
+                self.root.after(interval, update_alpha)
+        
+        update_alpha()
+    
+    def blend_colors(self, color1, color2, factor):
+        # Helper function to blend two colors
+        r1, g1, b1 = int(color1[1:3], 16), int(color1[3:5], 16), int(color1[5:7], 16)
+        r2, g2, b2 = int(color2[1:3], 16), int(color2[3:5], 16), int(color2[5:7], 16)
+        r = int(r1 + (r2 - r1) * factor)
+        g = int(g1 + (g2 - g1) * factor)
+        b = int(b1 + (b2 - b1) * factor)
+        return f"#{r:02x}{g:02x}{b:02x}"
     
     def show_selected_thumbnails(self, paths, force_page=False):
-        # Clear previous thumbnails
+        # Clear previous thumbnails immediately without fade
         for widget in self.thumbs_frame.winfo_children():
             widget.destroy()
         self.thumb_imgs.clear()
@@ -424,17 +584,29 @@ class ImageClassifierApp:
                     self.image_cache[cache_key] = img_tk
                 self.thumb_imgs.append(img_tk)
                 # Rounded frame and hover effect
+                # Create animated frame with shadow effect
                 frame = tk.Frame(self.thumbs_frame, bd=0, bg="#f9fafb", highlightbackground="#e0e6ef", highlightthickness=2)
                 frame.grid(row=idx//5, column=idx%5, padx=12, pady=12)
+                
+                # Add shadow frame behind for depth effect
+                shadow_frame = tk.Frame(frame, bg="#e0e6ef", width=240, height=180)
+                shadow_frame.place(x=4, y=4)  # Place shadow slightly offset
+                
                 lbl_img = tk.Label(frame, image=img_tk, bg="#f9fafb")
                 lbl_img.image = img_tk
                 lbl_img.pack()
                 lbl_img.bind('<Double-Button-1>', lambda e, p=img_path: self.open_full_image(p))
-                # Hover effect for thumbnail
-                def on_enter(ev, f=frame):
+                
+                # Enhanced hover animations
+                def on_enter(ev, f=frame, s=shadow_frame):
+                    # Instant color change with quick shadow animation
                     f.config(bg="#e3eafc", highlightbackground="#a5d8fa")
-                def on_leave(ev, f=frame):
+                    s.place(x=0, y=0)  # Quick lift effect
+                    
+                def on_leave(ev, f=frame, s=shadow_frame):
+                    # Instant color change with quick shadow reset
                     f.config(bg="#f9fafb", highlightbackground="#e0e6ef")
+                    s.place(x=4, y=4)  # Quick drop effect
                 frame.bind("<Enter>", on_enter)
                 frame.bind("<Leave>", on_leave)
                 lbl_img.bind("<Enter>", on_enter)
@@ -486,9 +658,27 @@ class ImageClassifierApp:
         self.thumb_canvas.update_idletasks()
         self.thumb_canvas.yview_moveto(0)
 
-    def on_image_check(self, var, path):
-        if var.get():
-            messagebox.showinfo("Image Selected", f"Selected: {os.path.basename(path)}")
+    def on_image_check(self, var, path, frame=None):
+        # Pulse animation when checking/unchecking
+        if frame:
+            original_color = frame.cget('bg')
+            highlight = "#a5d8fa" if var.get() else "#ffb4a2"
+            shadow_intensity = 4 if var.get() else 2
+            
+            def animate_pulse():
+                # Quick pulse animation
+                frame.config(bg=highlight)
+                for i in range(shadow_intensity, -1, -1):
+                    if hasattr(frame, 'shadow_frame'):
+                        frame.shadow_frame.place(x=i, y=i)
+                    self.root.after(10)
+                    self.root.update_idletasks()
+                self.root.after(100, lambda: frame.config(bg=original_color))
+            
+            animate_pulse()
+        
+        print(f"Selected: {os.path.basename(path)}")
+        #messagebox.showinfo("Image Selected", f"Selected: {os.path.basename(path)}")
 
     def show_img(self):
         img_list = self.get_current_list()
