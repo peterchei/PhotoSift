@@ -124,6 +124,9 @@ class ImageClassifierApp:
                 print(f"Error loading thumbnail: {e}")
                 continue
         
+        # Update zoom controls
+        self.update_zoom_controls()
+        
         # Reset cursor and update view
         self.root.config(cursor="")
         self.thumbs_frame.config(cursor="")
@@ -145,6 +148,12 @@ class ImageClassifierApp:
         self.page_size = 50  # images per page
         self.current_page = 0
         self.current_paths = []
+        
+        # Thumbnail size configuration
+        self.thumb_size = (240, 180)  # Default size
+        self.min_thumb_size = (60, 45)  # Minimum size
+        self.max_thumb_size = (580, 360)  # Maximum size
+        
         self.setup_ui()
 
     def setup_ui(self):
@@ -197,6 +206,27 @@ class ImageClassifierApp:
         # Card-like main content area with rounded corners and shadow
         card = tk.Frame(main_frame, bg="#f9fafb", bd=0, highlightbackground="#dbeafe", highlightthickness=2)
         card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 0), pady=0)
+        
+        # Add zoom controls
+        zoom_frame = tk.Frame(card, bg="#f9fafb")
+        zoom_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        # Add zoom out button
+        self.zoom_out_btn = tk.Button(zoom_frame, text="🔍-", command=self.zoom_out, 
+                                    font=("Segoe UI", 12), bg="#e0e6ef", activebackground="#d0d7e6",
+                                    bd=0, relief=tk.FLAT, cursor="hand2", highlightthickness=0)
+        self.zoom_out_btn.pack(side=tk.LEFT, padx=5, ipadx=8, ipady=2)
+        
+        # Add zoom in button
+        self.zoom_in_btn = tk.Button(zoom_frame, text="🔍+", command=self.zoom_in,
+                                   font=("Segoe UI", 12), bg="#e0e6ef", activebackground="#d0d7e6",
+                                   bd=0, relief=tk.FLAT, cursor="hand2", highlightthickness=0)
+        self.zoom_in_btn.pack(side=tk.LEFT, padx=5, ipadx=8, ipady=2)
+        
+        # Add zoom level label
+        self.zoom_label = tk.Label(zoom_frame, text="Zoom: 100%", bg="#f9fafb", font=("Segoe UI", 10))
+        self.zoom_label.pack(side=tk.LEFT, padx=10)
+        
         # Simulate a soft drop shadow for card (right side)
         card_shadow = tk.Frame(main_frame, bg="#e0e6ef", width=12)
         card_shadow.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 0), pady=18)
@@ -284,7 +314,9 @@ class ImageClassifierApp:
         self.content_frame.pack_forget()  # Hide initially
         self.thumbs_frame = tk.Frame(self.thumb_canvas, bg="#f9fafb")
         self.thumb_canvas.create_window((0,0), window=self.thumbs_frame, anchor="nw")
+        # Configure frame for layout updates
         self.thumbs_frame.bind("<Configure>", lambda e: self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all")))
+        self.thumb_canvas.bind("<Configure>", self.on_canvas_configure)
         self.thumb_imgs = []
         self.right_frame.pack_forget()  # Hide initially
 
@@ -302,6 +334,20 @@ class ImageClassifierApp:
         self.status_bar = tk.Label(self.root, textvariable=self.status_var, bd=0, relief=tk.FLAT, anchor=tk.W, bg="#c7d6f7", fg="#3a4a63", font=("Segoe UI", 11))
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(0,2))
 
+    def on_canvas_configure(self, event=None):
+        # Update scroll region
+        self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all"))
+        
+        # Only refresh layout if width changed significantly
+        if event and hasattr(self, 'last_width') and abs(event.width - self.last_width) < 50:
+            return
+            
+        self.last_width = event.width if event else self.thumb_canvas.winfo_width()
+        
+        # If we have current paths displayed, refresh the layout
+        if hasattr(self, 'current_paths') and self.current_paths:
+            self.show_selected_thumbnails(self.current_paths, force_page=True)
+    
     def show_progress_window(self, total):
         # Create progress window
         self.progress_window = tk.Toplevel(self.root)
@@ -500,6 +546,28 @@ class ImageClassifierApp:
             self.next_page_btn.config(state=tk.DISABLED)
             self.root.after(1, lambda: self.show_selected_thumbnails(self.current_paths, force_page=True))
     
+    def zoom_in(self):
+        current_width, current_height = self.thumb_size
+        new_width = min(int(current_width * 1.1), self.max_thumb_size[0])
+        new_height = min(int(current_height * 1.1), self.max_thumb_size[1])
+        if (new_width, new_height) != self.thumb_size:
+            self.thumb_size = (new_width, new_height)
+            self.show_selected_thumbnails(self.current_paths, force_page=True)
+            
+    def zoom_out(self):
+        current_width, current_height = self.thumb_size
+        new_width = max(int(current_width * 0.9), self.min_thumb_size[0])
+        new_height = max(int(current_height * 0.9), self.min_thumb_size[1])
+        if (new_width, new_height) != self.thumb_size:
+            self.thumb_size = (new_width, new_height)
+            self.show_selected_thumbnails(self.current_paths, force_page=True)
+            
+    def update_zoom_controls(self):
+        can_zoom_in = self.thumb_size[0] < self.max_thumb_size[0]
+        can_zoom_out = self.thumb_size[0] > self.min_thumb_size[0]
+        self.zoom_in_btn.config(state=tk.NORMAL if can_zoom_in else tk.DISABLED)
+        self.zoom_out_btn.config(state=tk.NORMAL if can_zoom_out else tk.DISABLED)
+    
     def update_page_controls(self):
         if not hasattr(self, 'current_paths') or not self.current_paths:
             self.page_label.config(text="Page 0 of 0")
@@ -571,25 +639,37 @@ class ImageClassifierApp:
         # Update navigation controls
         self.update_page_controls()
         
+        # Configure grid for proper spacing
+        cols = self.calculate_columns()
+        for i in range(cols):
+            self.thumbs_frame.grid_columnconfigure(i, weight=1)
+        
         # Show thumbnails for current page
         for idx, img_path in enumerate(page_paths):
             try:
-                thumb_size = (240, 180)
-                cache_key = (img_path, thumb_size)
+                cache_key = (img_path, self.thumb_size)
                 if cache_key in self.image_cache:
                     img_tk = self.image_cache[cache_key]
                 else:
-                    img = Image.open(img_path).resize(thumb_size)
+                    img = Image.open(img_path).resize(self.thumb_size)
                     img_tk = ImageTk.PhotoImage(img)
                     self.image_cache[cache_key] = img_tk
                 self.thumb_imgs.append(img_tk)
-                # Rounded frame and hover effect
+                
+                # Update zoom level indicator
+                base_width = 240  # Reference width
+                zoom_level = int((self.thumb_size[0] / base_width) * 100)
+                self.zoom_label.config(text=f"Zoom: {zoom_level}%")
+                
+                # Calculate layout position
+                cols = self.calculate_columns()
+                
                 # Create animated frame with shadow effect
                 frame = tk.Frame(self.thumbs_frame, bd=0, bg="#f9fafb", highlightbackground="#e0e6ef", highlightthickness=2)
-                frame.grid(row=idx//5, column=idx%5, padx=12, pady=12)
+                frame.grid(row=idx//cols, column=idx%cols, padx=12, pady=12, sticky='nsew')
                 
                 # Add shadow frame behind for depth effect
-                shadow_frame = tk.Frame(frame, bg="#e0e6ef", width=240, height=180)
+                shadow_frame = tk.Frame(frame, bg="#e0e6ef", width=self.thumb_size[0], height=self.thumb_size[1])
                 shadow_frame.place(x=4, y=4)  # Place shadow slightly offset
                 
                 lbl_img = tk.Label(frame, image=img_tk, bg="#f9fafb")
@@ -636,6 +716,19 @@ class ImageClassifierApp:
         self.thumb_canvas.update_idletasks()
         self.thumb_canvas.yview_moveto(0)
 
+    def calculate_columns(self):
+        # Get the actual width of the canvas
+        canvas_width = self.thumb_canvas.winfo_width()
+        if not canvas_width:
+            # If not yet realized, get parent's width
+            canvas_width = self.thumb_canvas.master.winfo_width() or 800
+        
+        # Calculate space needed for each thumbnail including padding
+        thumb_space = self.thumb_size[0] + 24  # thumbnail width + padding
+        
+        # Calculate number of columns that can fit
+        return max(1, canvas_width // thumb_space)
+    
     def count_selected_photos(self):
         return sum(var.get() for var, _ in self.selected_check_vars)
 
