@@ -12,11 +12,17 @@ processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 LABELS = {
     "people": [
         "a photo of a person", "a photo of people",
-        "a portrait photo", "a candid photo of a person"
+        "a portrait photo", "a candid photo of a person",
+        "a group photo", "a selfie", "a family photo", "a photo of friends",
+        "a photo of a child", "a photo of an adult", "a photo of a view"
     ],
     "screenshot": [
         "a computer screenshot", "a phone screenshot",
-        "a screen capture of an app UI", "a screenshot of a website"
+        "a screen capture of an app UI", "a screenshot of a website",
+        "a screenshot of a video call", "a screenshot of a chat conversation",
+        "a screenshot of a social media post", "a screenshot of a text message",
+        "a screenshot of an email", "a screenshot of a document", 
+        "a photo of a computer screen", "a photo of a phone screen"
     ],
 }
 
