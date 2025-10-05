@@ -135,7 +135,7 @@ class ImageClassifierApp:
         self.thumb_canvas.yview_moveto(0)
     def __init__(self, root):
         self.root = root
-        self.root.title("Screenshot Identifier")
+        self.root.title("Find Out Photo Unwanted")
         self.root.geometry("800x600")
         self.folder = None
         self.images = []
@@ -166,7 +166,7 @@ class ImageClassifierApp:
         header.pack(fill=tk.X)
         header.create_rectangle(0, 0, 2000, 60, fill="#e3eafc", outline="")
         header.create_rectangle(0, 0, 2000, 30, fill="#c7d6f7", outline="")
-        header.create_text(32, 30, anchor="w", text="PhotoSift - Screenshot Identifier", font=("Segoe UI", 22, "bold"), fill="#3a4a63")
+        header.create_text(32, 30, anchor="w", text="PhotoSift - Find Out Photo Unwanted", font=("Segoe UI", 22, "bold"), fill="#3a4a63")
 
         # Top frame for folder selection and trash button
         frm = tk.Frame(self.root, bg="#f7fafc")
@@ -324,6 +324,52 @@ class ImageClassifierApp:
         self.thumb_canvas.configure(yscrollcommand=self.thumb_scrollbar.set)
         self.thumb_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.thumb_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Create thumbs frame first
+        self.thumbs_frame = tk.Frame(self.thumb_canvas, bg="#f9fafb")
+        self.thumb_canvas.create_window((0,0), window=self.thumbs_frame, anchor="nw")
+        self.thumbs_frame.bind("<Configure>", lambda e: self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all")))
+        
+        # Simple mouse wheel scrolling
+        def _on_mousewheel(event):
+            self.thumb_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            
+        self.thumbs_frame.bind("<MouseWheel>", _on_mousewheel)
+        self.thumb_container.bind("<MouseWheel>", _on_mousewheel)
+        self.thumb_canvas.bind("<MouseWheel>", _on_mousewheel)
+        
+        # Enable mouse wheel scrolling with error handling
+        def on_mousewheel(event):
+            try:
+                scroll_amount = -1 if event.delta > 0 else 1
+                self.thumb_canvas.yview_scroll(scroll_amount, "units")
+            except Exception as e:
+                print(f"Scroll error: {str(e)}")
+                
+        # Bind mouse wheel events safely
+        try:
+            self.thumb_canvas.bind_all("<MouseWheel>", on_mousewheel)
+        except Exception as e:
+            print(f"Binding error: {str(e)}")
+        
+        # Enable mouse wheel scrolling
+        def on_mousewheel(event):
+            if event.state == 0:  # No modifier keys
+                # Regular scroll
+                self.thumb_canvas.yview_scroll(-1 * (event.delta // 120), "units")
+            elif event.state == 1:  # Shift key for horizontal scroll
+                # Horizontal scroll
+                self.thumb_canvas.xview_scroll(-1 * (event.delta // 120), "units")
+                
+        # Bind mouse wheel for Windows (MouseWheel) and macOS/Linux (Button-4/Button-5)
+        self.thumb_canvas.bind("<MouseWheel>", on_mousewheel)  # Windows
+        self.thumb_canvas.bind("<Button-4>", lambda e: self.thumb_canvas.yview_scroll(-1, "units"))  # Linux/macOS scroll up
+        self.thumb_canvas.bind("<Button-5>", lambda e: self.thumb_canvas.yview_scroll(1, "units"))   # Linux/macOS scroll down
+        
+        # Also bind the thumbnails frame for better event capture
+        self.thumbs_frame.bind("<MouseWheel>", on_mousewheel)
+        self.thumbs_frame.bind("<Button-4>", lambda e: self.thumb_canvas.yview_scroll(-1, "units"))
+        self.thumbs_frame.bind("<Button-5>", lambda e: self.thumb_canvas.yview_scroll(1, "units"))
         
         self.content_frame.pack_forget()  # Hide initially
         self.thumbs_frame = tk.Frame(self.thumb_canvas, bg="#f9fafb")
