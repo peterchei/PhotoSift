@@ -404,8 +404,17 @@ class ImageClassifierApp:
         if folder:
             self.folder = folder
             self.lbl_folder.config(text=folder)
-            self.images = [os.path.join(dp, f) for dp, dn, filenames in os.walk(folder)
-                           for f in filenames if os.path.splitext(f)[1].lower() in IMG_EXT]
+            # Walk through directory but exclude Trash folder
+            self.images = []
+            for dp, dn, filenames in os.walk(folder):
+                # Skip the Trash directory and its subdirectories
+                if "Trash" in dp.split(os.sep):
+                    continue
+                    
+                # Add valid images to the list
+                for f in filenames:
+                    if os.path.splitext(f)[1].lower() in IMG_EXT:
+                        self.images.append(os.path.join(dp, f))
             self.people_images = []
             self.screenshot_images = []
             self.image_labels = {}  # path -> label
