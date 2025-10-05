@@ -803,18 +803,18 @@ class ImageClassifierApp:
                 print(f"Failed to move {img_path}: {str(e)}")
                 failed_files.append(base_name)
 
-        # Show simple popup message
+        # Show professional popup message
         try:
             popup = tk.Toplevel()
-            popup.title("Clean Complete")
+            popup.title("Operation Status")
             
             # Make the window float on top
             popup.lift()
             popup.attributes('-topmost', True)
             
-            # Basic window setup
-            window_width = 300
-            window_height = 100
+            # Enhanced window setup
+            window_width = 380
+            window_height = 150
             
             # Get the position of the main window
             main_window_x = self.root.winfo_x()
@@ -829,27 +829,74 @@ class ImageClassifierApp:
             # Set window geometry
             popup.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
             
-            # Configure basic style
-            popup.configure(bg='white')
+            # Configure window style
+            popup.configure(bg='#ffffff')
+            popup.overrideredirect(True)  # Remove window decorations
             
-            # Create message
+            # Create main container with border
+            border_frame = tk.Frame(popup, bg='#e2e8f0', padx=1, pady=1)
+            border_frame.pack(fill=tk.BOTH, expand=True)
+            
+            main_frame = tk.Frame(border_frame, bg='#ffffff')
+            main_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Header bar
+            header_frame = tk.Frame(main_frame, bg='#f8fafc', height=32)
+            header_frame.pack(fill=tk.X)
+            header_frame.pack_propagate(False)
+            
+            header_label = tk.Label(header_frame, text="Operation Complete",
+                                  bg='#f8fafc', fg='#334155',
+                                  font=("Segoe UI", 11, "bold"))
+            header_label.pack(side=tk.LEFT, padx=15, pady=6)
+            
+            # Content frame with padding
+            content_frame = tk.Frame(main_frame, bg='#ffffff', padx=20, pady=15)
+            content_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Status icon and colors
             if failed_files:
-                message = f"Moved {moved_count} photos to Trash.\nFailed: {len(failed_files)} files"
-                fg_color = "red"
+                icon = "⚠"
+                title = "Partial Success"
+                icon_color = "#dc2626"  # Red
+                message = f"Moved {moved_count} photos to Trash\n"
+                if len(failed_files) > 0:
+                    message += f"Failed to move {len(failed_files)} files"
             else:
+                icon = "✓"
+                title = "Success"
+                icon_color = "#0369a1"  # Blue
                 message = f"Successfully moved {moved_count} photos to Trash"
-                fg_color = "blue"
             
-            # Add message label
-            label = tk.Label(popup, text=message, bg='white', fg=fg_color, 
-                           font=("Segoe UI", 11))
-            label.pack(expand=True)
+            # Icon
+            icon_label = tk.Label(content_frame, text=icon, bg='#ffffff',
+                                fg=icon_color, font=("Segoe UI", 24))
+            icon_label.pack(pady=(0, 5))
+            
+            # Title
+            title_label = tk.Label(content_frame, text=title, bg='#ffffff',
+                                 fg=icon_color, font=("Segoe UI", 12, "bold"))
+            title_label.pack(pady=(0, 8))
+            
+            # Message
+            msg_label = tk.Label(content_frame, text=message, bg='#ffffff',
+                               fg='#475569', font=("Segoe UI", 11))
+            msg_label.pack()
             
             # Force the window to update and show
             popup.update()
             
-            # Schedule destruction
-            popup.after(2000, popup.destroy)
+            # Add subtle fade out before destruction
+            def fade_out():
+                for i in range(10):
+                    opacity = 1.0 - (i / 10)
+                    popup.attributes('-alpha', opacity)
+                    popup.update()
+                    popup.after(50)
+                popup.destroy()
+            
+            # Schedule fade out and destruction
+            popup.after(1500, fade_out)
             
         except Exception as e:
             print(f"Error showing popup: {str(e)}")
