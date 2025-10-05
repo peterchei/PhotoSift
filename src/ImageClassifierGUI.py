@@ -168,10 +168,23 @@ class ImageClassifierApp:
         header.create_rectangle(0, 0, 2000, 30, fill="#c7d6f7", outline="")
         header.create_text(32, 30, anchor="w", text="PhotoSift - Screenshot Identifier", font=("Segoe UI", 22, "bold"), fill="#3a4a63")
 
-        # Top frame for folder selection
+        # Top frame for folder selection and trash button
         frm = tk.Frame(self.root, bg="#f7fafc")
         frm.pack(fill=tk.X, padx=24, pady=(14, 18))
+        
+        # Right side container for trash button
+        trash_container = tk.Frame(frm, bg="#f7fafc")
+        trash_container.pack(side=tk.RIGHT)
+        
+        # Trash button with counter
+        self.trash_btn_var = tk.StringVar(value="Trash (0)")
         style_btn = {"font": ("Segoe UI", 12, "bold"), "bg": "#e0e6ef", "activebackground": "#d0d7e6", "activeforeground": "#3a4a63", "bd": 0, "relief": tk.FLAT, "cursor": "hand2", "highlightthickness": 0}
+        self.trash_btn = tk.Button(trash_container, textvariable=self.trash_btn_var, command=self.open_trash_folder, **style_btn)
+        self.trash_btn.pack(side=tk.RIGHT, padx=(0, 0), ipadx=10, ipady=4)
+        self.trash_btn.bind("<Enter>", lambda e: self.trash_btn.config(bg="#d0d7e6"))
+        self.trash_btn.bind("<Leave>", lambda e: self.trash_btn.config(bg="#e0e6ef"))
+        
+        # Select folder button
         btn = tk.Button(frm, text="Select Folder", command=self.select_folder, **style_btn)
         btn.pack(side=tk.LEFT, padx=(0, 16), ipadx=10, ipady=4)
         btn.bind("<Enter>", lambda e: btn.config(bg="#d0d7e6"))
@@ -399,11 +412,36 @@ class ImageClassifierApp:
         if hasattr(self, 'progress_window') and self.progress_window.winfo_exists():
             self.progress_window.destroy()
 
+    def open_trash_folder(self):
+        if self.folder:
+            trash_path = os.path.join(self.folder, "Trash")
+            if os.path.exists(trash_path):
+                os.startfile(trash_path)  # Windows specific
+            else:
+                messagebox.showinfo("Trash Folder", "Trash folder does not exist yet.")
+        else:
+            messagebox.showinfo("Trash Folder", "Please select a folder first.")
+    
+    def update_trash_count(self):
+        if self.folder:
+            trash_path = os.path.join(self.folder, "Trash")
+            if os.path.exists(trash_path):
+                # Count image files in trash
+                count = sum(1 for f in os.listdir(trash_path) 
+                         if os.path.isfile(os.path.join(trash_path, f)) 
+                         and os.path.splitext(f)[1].lower() in IMG_EXT)
+                self.trash_count = count
+                self.trash_btn_var.set(f"Trash ({count})")
+            else:
+                self.trash_count = 0
+                self.trash_btn_var.set("Trash (0)")
+    
     def select_folder(self):
         folder = filedialog.askdirectory()
         if folder:
             self.folder = folder
             self.lbl_folder.config(text=folder)
+            self.update_trash_count()  # Update trash count when folder is selected
             # Walk through directory but exclude Trash folder
             self.images = []
             for dp, dn, filenames in os.walk(folder):
@@ -908,6 +946,7 @@ class ImageClassifierApp:
 
         # Refresh UI
         self.populate_tree()  # Update the category tree
+        self.update_trash_count()  # Update the trash count
         
         # If we're in thumbnail view, refresh it
         if self.current_paths:
