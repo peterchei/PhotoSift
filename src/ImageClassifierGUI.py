@@ -2,6 +2,7 @@
 # Standard library imports
 import os
 import threading
+import shutil
 
 # Third-party imports
 import tkinter as tk
@@ -736,9 +737,92 @@ class ImageClassifierApp:
         self.clean_btn_var.set(f"Clean ({count})")
 
     def clean_selected_photos(self):
-        # Placeholder for clean action
+        # Get selected photos
         selected = [img_path for var, img_path in self.selected_check_vars if var.get()]
-        messagebox.showinfo("Clean", f"You selected {len(selected)} photo(s) to clean.\nPaths: {selected}")
+        if not selected:
+            messagebox.showinfo("Clean", "No photos selected.")
+            return
+
+        # Ask for confirmation
+        if not messagebox.askyesno("Confirm Clean", 
+                                 f"Are you sure you want to move {len(selected)} photo(s) to trash?"):
+            return
+
+        # Create Trash directory if it doesn't exist
+        if not self.folder:
+            messagebox.showerror("Error", "No folder selected.")
+            return
+
+        trash_dir = os.path.join(self.folder, "Trash")
+        try:
+            os.makedirs(trash_dir, exist_ok=True)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to create Trash directory:\n{str(e)}")
+            return
+
+        # Move files to trash
+        moved_count = 0
+        failed_files = []
+        
+        for img_path in selected:
+            try:
+                # Generate unique filename in case of duplicates
+                base_name = os.path.basename(img_path)
+                name, ext = os.path.splitext(base_name)
+                target_path = os.path.join(trash_dir, base_name)
+                counter = 1
+                
+                while os.path.exists(target_path):
+                    target_path = os.path.join(trash_dir, f"{name}_{counter}{ext}")
+                    counter += 1
+                
+                # Move the file
+                shutil.move(img_path, target_path)
+                moved_count += 1
+                
+                # Remove from data structures
+                if img_path in self.images:
+                    self.images.remove(img_path)
+                if img_path in self.people_images:
+                    self.people_images.remove(img_path)
+                if img_path in self.screenshot_images:
+                    self.screenshot_images.remove(img_path)
+                if img_path in self.image_labels:
+                    del self.image_labels[img_path]
+                if img_path in self.confidence_scores:
+                    del self.confidence_scores[img_path]
+                if img_path in self.image_cache:
+                    del self.image_cache[img_path]
+                    
+            except Exception as e:
+                print(f"Failed to move {img_path}: {str(e)}")
+                failed_files.append(base_name)
+
+        # Show completion message
+        if failed_files:
+            messagebox.showwarning("Clean Complete", 
+                                 f"Moved {moved_count} photos to Trash.\n" +
+                                 f"Failed to move {len(failed_files)} photos:\n" +
+                                 "\n".join(failed_files[:5]) +
+                                 ("\n..." if len(failed_files) > 5 else ""))
+        else:
+            messagebox.showinfo("Clean Complete", 
+                              f"Successfully moved {moved_count} photos to Trash.")
+
+        # Refresh UI
+        self.populate_tree()  # Update the category tree
+        
+        # If we're in thumbnail view, refresh it
+        if self.current_paths:
+            # Remove cleaned images from current_paths
+            self.current_paths = [p for p in self.current_paths if p not in selected]
+            if self.current_paths:
+                self.show_selected_thumbnails(self.current_paths, force_page=True)
+            else:
+                # No images left in current view
+                self.right_frame.pack_forget()
+                self.center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+                self.content_frame.pack_forget()
 
     def open_full_image(self, img_path):
         top = tk.Toplevel(self.root)
