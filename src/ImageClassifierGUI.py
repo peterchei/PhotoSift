@@ -752,10 +752,6 @@ class ImageClassifierApp:
             messagebox.showinfo("Clean", "No photos selected.")
             return
 
-        # Ask for confirmation
-        if not messagebox.askyesno("Confirm Clean", 
-                                 f"Are you sure you want to move {len(selected)} photo(s) to trash?"):
-            return
 
         # Create Trash directory if it doesn't exist
         if not self.folder:
@@ -807,16 +803,72 @@ class ImageClassifierApp:
                 print(f"Failed to move {img_path}: {str(e)}")
                 failed_files.append(base_name)
 
-        # Show completion message
+        # Show completion message in auto-closing popup
+        popup = tk.Toplevel(self.root)
+        popup.title("Operation Complete")
+        popup.transient(self.root)
+        
+        # Set size and get parent window position
+        window_width = 400
+        window_height = 160
+        parent_x = self.root.winfo_x()
+        parent_y = self.root.winfo_y()
+        parent_width = self.root.winfo_width()
+        parent_height = self.root.winfo_height()
+        
+        # Center relative to parent window
+        x = parent_x + (parent_width - window_width) // 2
+        y = parent_y + (parent_height - window_height) // 2
+        popup.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        
+        # Configure popup style
+        popup.configure(bg="#ffffff")
+        popup.overrideredirect(True)  # Remove window decorations
+        
+        # Create main frame with border
+        outer_frame = tk.Frame(popup, bg="#dbeafe", padx=1, pady=1)
+        outer_frame.pack(fill=tk.BOTH, expand=True)
+        
+        frame = tk.Frame(outer_frame, bg="#ffffff")
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title bar
+        title_frame = tk.Frame(frame, bg="#f1f5f9", height=30)
+        title_frame.pack(fill=tk.X)
+        title_frame.pack_propagate(False)
+        
+        title_label = tk.Label(title_frame, text="Clean Operation Complete", 
+                              bg="#f1f5f9", fg="#334155",
+                              font=("Segoe UI", 11, "bold"))
+        title_label.pack(side=tk.LEFT, padx=15, pady=5)
+        
+        # Message container
+        msg_frame = tk.Frame(frame, bg="#ffffff", padx=20, pady=15)
+        msg_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Icon and message
         if failed_files:
-            messagebox.showwarning("Clean Complete", 
-                                 f"Moved {moved_count} photos to Trash.\n" +
-                                 f"Failed to move {len(failed_files)} photos:\n" +
-                                 "\n".join(failed_files[:5]) +
-                                 ("\n..." if len(failed_files) > 5 else ""))
+            message = (f"Moved {moved_count} photos to Trash.\n" +
+                      f"Failed to move {len(failed_files)} photos:\n" +
+                      "\n".join(failed_files[:5]) +
+                      ("\n..." if len(failed_files) > 5 else ""))
+            icon = "⚠️"
+            msg_color = "#dc2626"
         else:
-            messagebox.showinfo("Clean Complete", 
-                              f"Successfully moved {moved_count} photos to Trash.")
+            message = f"Successfully moved {moved_count} photos to Trash."
+            icon = "✓"
+            msg_color = "#1e40af"
+            
+        icon_label = tk.Label(msg_frame, text=icon, bg="#ffffff", 
+                            fg=msg_color, font=("Segoe UI", 16))
+        icon_label.pack(pady=(0, 10))
+        
+        label = tk.Label(msg_frame, text=message, bg="#ffffff",
+                        fg="#334155", font=("Segoe UI", 11))
+        label.pack()
+        
+        # Auto-close after 1 second
+        popup.after(1000, popup.destroy)
 
         # Refresh UI
         self.populate_tree()  # Update the category tree
