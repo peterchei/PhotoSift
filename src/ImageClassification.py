@@ -14,7 +14,7 @@ LABELS = {
         "a photo of a person", "a photo of people",
         "a portrait photo", "a candid photo of a person",
         "a group photo", "a selfie", "a family photo", "a photo of friends",
-        "a photo of a child", "a photo of an adult", "a photo of a view"
+        "a photo of a child", "a photo of an adult", "photo of scenery"
     ],
     "screenshot": [
         "a computer screenshot", "a phone screenshot",

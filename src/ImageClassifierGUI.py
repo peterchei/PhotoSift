@@ -1018,23 +1018,17 @@ class ImageClassifierApp:
         self.thumb_canvas.yview_moveto(0)
 
     def on_image_check(self, var, path, frame=None):
-        # Pulse animation when checking/unchecking
         if frame:
-            original_color = frame.cget('bg')
-            highlight = "#a5d8fa" if var.get() else "#ffb4a2"
-            shadow_intensity = 4 if var.get() else 2
-            
-            def animate_pulse():
-                # Quick pulse animation
-                frame.config(bg=highlight)
-                for i in range(shadow_intensity, -1, -1):
-                    if hasattr(frame, 'shadow_frame'):
-                        frame.shadow_frame.place(x=i, y=i)
-                    self.root.after(10)
-                    self.root.update_idletasks()
-                self.root.after(100, lambda: frame.config(bg=original_color))
-            
-            animate_pulse()
+            if var.get():
+                # Selected state - blue highlight and thicker border
+                frame.config(bg="#e3eafc", highlightbackground="#3399ff", highlightthickness=3)
+                if hasattr(frame, 'shadow_frame'):
+                    frame.shadow_frame.place(x=0, y=0)  # Lift effect when selected
+            else:
+                # Unselected state - default colors and border
+                frame.config(bg="#f9fafb", highlightbackground="#e0e6ef", highlightthickness=2)
+                if hasattr(frame, 'shadow_frame'):
+                    frame.shadow_frame.place(x=4, y=4)  # Normal shadow when unselected
         
         print(f"Selected: {os.path.basename(path)}")
         #messagebox.showinfo("Image Selected", f"Selected: {os.path.basename(path)}")
