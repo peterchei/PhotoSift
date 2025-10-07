@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: PhotoSift
+Version: 1.0.0
+Summary: An AI-powered photo classification and organization tool
+Author: peterchei
+Requires-Python: >=3.8
+Requires-Dist: torch
+Requires-Dist: torchvision
+Requires-Dist: Pillow
+Requires-Dist: numpy
+Dynamic: requires-python

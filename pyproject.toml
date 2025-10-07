@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PhotoSift"
+version = "1.0.0"
+description = "An AI-powered photo classification and organization tool"
+authors = [
+    {name = "peterchei"}
+]
+requires-python = ">=3.8"
+dependencies = [
+    "torch",
+    "torchvision",
+    "Pillow",
+    "numpy",
+]
+
+[tool.pyinstaller]
+hiddenimports = [
+    "PIL",
+    "torch",
+    "torchvision",
+]
