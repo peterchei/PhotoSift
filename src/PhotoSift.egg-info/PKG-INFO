@@ -8,4 +8,5 @@ Requires-Dist: torch
 Requires-Dist: torchvision
 Requires-Dist: Pillow
 Requires-Dist: numpy
+Requires-Dist: transformers
 Dynamic: requires-python

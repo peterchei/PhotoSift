@@ -1,4 +1,4 @@
-import os, glob, time
+import os, glob, time, sys
 from pathlib import Path
 
 import torch, numpy as np
@@ -6,8 +6,20 @@ from PIL import Image
 from transformers import CLIPModel, CLIPProcessor
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device).eval()
-processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+def get_model_path():
+    # Check if running in PyInstaller bundle
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+        model_path = os.path.join(base_path, 'huggingface', 'hub')
+    else:
+        # Running in normal Python environment
+        model_path = "openai/clip-vit-base-patch32"
+    return model_path
+
+model_path = get_model_path()
+model = CLIPModel.from_pretrained(model_path).to(device).eval()
+processor = CLIPProcessor.from_pretrained(model_path)
 
 LABELS = {
     "people": [

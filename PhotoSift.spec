@@ -4,10 +4,26 @@ block_cipher = None
 
 a = Analysis(
     ['src/ImageClassifierGUI.py'],
-    pathex=[],
+    pathex=['src'],
     binaries=[],
-    datas=[],
-    hiddenimports=['PIL', 'torch', 'torchvision'],
+    datas=[
+        ('src/*.py', '.'),  # Include all Python files
+        (os.path.join(os.path.expanduser('~'), '.cache', 'huggingface', 'hub'), 'huggingface/hub'),  # Include CLIP model files
+    ],
+    hiddenimports=[
+        'PIL',
+        'torch', 
+        'torchvision',
+        'numpy',
+        'tkinter',
+        'tkinter.ttk',
+        'tkinter.filedialog',
+        'tkinter.messagebox',
+        'transformers',
+        'transformers.models.clip',
+        'transformers.models.clip.modeling_clip',
+        'transformers.models.clip.processing_clip'
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -38,5 +54,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='resources/app.ico'  # You can add an icon file here if you have one
+    icon='resources/app.ico',
+    version='version_info.txt'
 )

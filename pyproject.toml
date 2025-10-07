@@ -15,6 +15,7 @@ dependencies = [
     "torchvision",
     "Pillow",
     "numpy",
+    "transformers",
 ]
 
 [tool.pyinstaller]

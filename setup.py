@@ -10,6 +10,7 @@ setup(
         "torchvision",
         "Pillow",
         "numpy",
+        "transformers",
     ],
     python_requires=">=3.8",
     entry_points={
