@@ -8,7 +8,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('src/*.py', '.'),  # Include all Python files
-        (os.path.join(os.path.expanduser('~'), '.cache', 'huggingface', 'hub'), 'huggingface/hub'),  # Include CLIP model files
+        ('models/clip-vit-base-patch32/*', 'models/clip-vit-base-patch32/'),  # Include CLIP model files
     ],
     hiddenimports=[
         'PIL',

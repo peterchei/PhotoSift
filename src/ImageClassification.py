@@ -11,15 +11,25 @@ def get_model_path():
     # Check if running in PyInstaller bundle
     if getattr(sys, 'frozen', False):
         base_path = sys._MEIPASS
-        model_path = os.path.join(base_path, 'huggingface', 'hub')
+        model_path = os.path.join(base_path, 'models', 'clip-vit-base-patch32')
     else:
-        # Running in normal Python environment
-        model_path = "openai/clip-vit-base-patch32"
+        # First check if we have local model files
+        local_path = os.path.join('models', 'clip-vit-base-patch32')
+        if os.path.exists(local_path):
+            model_path = local_path
+        else:
+            # Fall back to downloading from HuggingFace
+            model_path = "openai/clip-vit-base-patch32"
     return model_path
 
-model_path = get_model_path()
-model = CLIPModel.from_pretrained(model_path).to(device).eval()
-processor = CLIPProcessor.from_pretrained(model_path)
+try:
+    model_path = get_model_path()
+    model = CLIPModel.from_pretrained(model_path).to(device).eval()
+    processor = CLIPProcessor.from_pretrained(model_path)
+except Exception as e:
+    print(f"Error loading model: {str(e)}")
+    print(f"Attempted to load from: {model_path}")
+    raise
 
 LABELS = {
     "people": [

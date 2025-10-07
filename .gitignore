@@ -1,2 +1,6 @@
 src/__pycache__/ImageClassification.cpython-313.pyc
 src/__pycache__/DuplicateImageIdentifier.cpython-313.pyc
+build/**
+Output/**
+dist/** 
+models/**
