@@ -1,0 +1,189 @@
+# Microsoft Store Submission Guide for PhotoSift
+
+## Prerequisites
+
+1. **Developer Account**
+   - Register at [Microsoft Partner Center](https://partner.microsoft.com/dashboard/registration)
+   - One-time registration fee: $19 (individual account)
+   - Complete identity verification process
+
+2. **Required Tools**
+   - [Windows SDK](https://developer.microsoft.com/windows/downloads/windows-sdk/)
+   - Visual Studio (recommended for development)
+   - Code signing certificate
+
+## Package Preparation
+
+1. **Generate Store Package**
+   ```powershell
+   # Run the package creation script
+   .\create_store_package.bat
+   ```
+
+2. **Create MSIX Package**
+   ```powershell
+   # Navigate to Windows SDK directory
+   cd "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64"
+   
+   # Create MSIX package
+   .\makeappx.exe pack /d store_package /p PhotoSift.msix
+   ```
+
+3. **Sign the Package**
+   ```powershell
+   # Generate test certificate (development only)
+   New-SelfSignedCertificate -Type Custom `
+       -Subject "CN=PhotoSift" `
+       -KeyUsage DigitalSignature `
+       -FriendlyName "PhotoSift Certificate" `
+       -CertStoreLocation "Cert:\CurrentUser\My" `
+       -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+
+   # Sign the package
+   signtool sign /fd SHA256 /a /f your_cert.pfx PhotoSift.msix
+   ```
+
+## Required Assets
+
+### Store Listing Graphics
+- **App Logo Sizes**
+  - 50x50 px
+  - 71x71 px
+  - 150x150 px
+  - 300x300 px
+
+### Screenshots
+- Minimum: 1 screenshot
+- Recommended: 3-8 screenshots
+- Resolution: 1920x1080 px (landscape)
+- Format: PNG or JPEG
+- Suggestions for PhotoSift:
+  1. Main interface with images loaded
+  2. Classification process in action
+  3. Sorted results showing people photos
+  4. Sorted results showing screenshots
+  5. Settings or preferences panel
+
+### Feature Graphic
+- Size: 2400x1200 px
+- Format: PNG or JPEG
+- Must represent app's core features
+- Suggested design for PhotoSift:
+  - Split view showing before/after organization
+  - AI classification visualization
+  - Clean, modern design highlighting efficiency
+
+## Store Submission Process
+
+1. **Access Partner Center**
+   - Go to [Partner Center Dashboard](https://partner.microsoft.com/dashboard)
+   - Select 'Create a new app'
+
+2. **Product Setup**
+   - Product type: Application
+   - Name reservation: "PhotoSift"
+   - Category: 
+     - Primary: Photo & Video
+     - Secondary: Productivity
+
+3. **Properties**
+   - Privacy Policy URL
+   - Support contact info
+   - Website link: https://github.com/peterchei/PhotoSift
+
+4. **Store Listing**
+   - Description (Sample):
+     ```
+     PhotoSift is an AI-powered image organization tool that automatically categorizes your photos using advanced machine learning technology. Perfect for photographers, social media managers, and anyone looking to organize their photo collection efficiently.
+
+     Key Features:
+     • AI-powered image classification
+     • Automatic sorting of people photos and screenshots
+     • Drag and drop interface
+     • Batch processing capability
+     • Real-time classification feedback
+     • Easy file management
+     • Modern, user-friendly interface
+
+     Save hours of manual sorting and keep your photo collection organized automatically with PhotoSift.
+     ```
+   - Search terms: photo organizer, image sorter, AI photo tool, picture organization
+   - Screenshots (as described above)
+   - App logos
+   - Feature graphic
+
+5. **Technical Configuration**
+   - Upload MSIX package
+   - System Requirements:
+     - Windows 10 version 17763.0 or higher
+     - 4GB RAM minimum
+     - DirectX 11 compatible graphics
+   - Capabilities:
+     - File system access
+     - Pictures library access
+
+6. **Pricing and Availability**
+   - Price: Free
+   - Markets: All markets
+   - Release: Immediate
+   - Visibility: Public
+
+7. **Age Ratings**
+   - Expected rating: ESRB EVERYONE
+   - No offensive content
+   - No real-time communication
+   - No user data collection beyond basic app functionality
+
+## Testing
+
+1. **Local Testing**
+   ```powershell
+   # Install package locally
+   Add-AppxPackage -Path PhotoSift.msix
+   ```
+
+2. **Validation Testing**
+   - Run Windows App Certification Kit
+   - Test on various Windows versions
+   - Verify all features:
+     - Image loading
+     - Classification
+     - UI responsiveness
+     - File operations
+
+## Submission Checklist
+
+- [ ] Developer account active
+- [ ] MSIX package created and signed
+- [ ] App logos created (all sizes)
+- [ ] Screenshots prepared
+- [ ] Feature graphic designed
+- [ ] Privacy policy published
+- [ ] Support contact info ready
+- [ ] Age rating questionnaire completed
+- [ ] Local testing completed
+- [ ] Package validated with certification kit
+
+## Resources
+
+- [Partner Center](https://partner.microsoft.com/dashboard)
+- [Windows SDK Documentation](https://docs.microsoft.com/windows/win32)
+- [Store Submission Guidelines](https://docs.microsoft.com/windows/uwp/publish)
+- [MSIX Documentation](https://docs.microsoft.com/windows/msix)
+
+## Support
+
+For additional help:
+- Microsoft Store Support: [Partner Center Support](https://partner.microsoft.com/support)
+- Developer Community: [Windows Developer Community](https://docs.microsoft.com/windows/apps)
+- PhotoSift Issues: [GitHub Issues](https://github.com/peterchei/PhotoSift/issues)
+
+## Notes
+
+Remember to:
+1. Test the MSIX package thoroughly before submission
+2. Prepare all graphics assets in advance
+3. Write clear, engaging store descriptions
+4. Set up proper support channels
+5. Monitor the submission process in Partner Center
+6. Respond quickly to any certification feedback

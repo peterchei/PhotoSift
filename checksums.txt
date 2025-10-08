@@ -1,0 +1,7 @@
+SHA-256 Checksums: 
+SHA256 hash of dist\PhotoSift.exe:
+3d5ff548a60d9d3e2a84c7d2e34aa6fbcc1fff2f5bc8ddbd8237aa5d131e3be8
+CertUtil: -hashfile command completed successfully.
+SHA256 hash of Output\PhotoSift_Setup.exe:
+885bb9b9f5a488c5935cc569978fa135a09216ac2aab60e056aad0c381a03914
+CertUtil: -hashfile command completed successfully.
