@@ -8,9 +8,8 @@
    - Complete identity verification process
 
 2. **Required Tools**
-   - [Windows SDK](https://developer.microsoft.com/windows/downloads/windows-sdk/)
-   - Visual Studio (recommended for development)
-   - Code signing certificate
+   - [MSIX Packaging Tool](https://www.microsoft.com/store/productId/9N5LW3JBCXKF) from Microsoft Store
+   - Optional: Visual Studio (recommended for development)
 
 ## Package Preparation
 
@@ -23,20 +22,7 @@
    - Square44x44Logo (44x44)
    - Square150x150Logo (150x150)
 
-2. **Generate Store Package**
-   ```powershell
-   # Run the package creation script
-   .\create_store_package.bat
-   ```
-   This will create the store package with all the necessary files and proper manifest entries.
-
-3. **Create MSIX Package**
-   ```powershell
-   # Create MSIX package using Windows SDK
-   & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\makeappx.exe" pack /d store_package /p PhotoSift.msix
-   ```
-
-4. **Create Store Package using MSIX Packaging Tool**
+2. **Create Store Package using MSIX Packaging Tool**
 
    A. **Install MSIX Packaging Tool**
    - Download and install the [MSIX Packaging Tool](https://apps.microsoft.com/store/detail/msix-packaging-tool/9N5LW3JBCXKF) from the Microsoft Store
@@ -71,6 +57,19 @@
    ```
 
    > Note: The MSIX Packaging Tool handles signing automatically for store submission. When testing locally, Developer Mode allows running unsigned packages.
+
+## Store Submission Steps
+
+1. Go to [Partner Center](https://partner.microsoft.com/dashboard)
+2. Create a new app submission
+3. Upload the generated .msix package
+4. Fill in required store listing information:
+   - App name
+   - Description
+   - Category: Utilities & Tools
+   - Pricing
+   - Age ratings
+5. Submit for certification
 
 ## Required Assets
 
