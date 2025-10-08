@@ -15,11 +15,8 @@ def create_store_assets():
 
     # Define required sizes for store assets
     sizes = {
-        "StoreLogo": 50,
         "Square44x44Logo": 44,
-        "Square71x71Logo": 71,
-        "Square150x150Logo": 150,
-        "Square310x310Logo": 310
+        "Square150x150Logo": 150
     }
 
     # Create each required size
