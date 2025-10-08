@@ -4,3 +4,4 @@ build/**
 Output/**
 dist/** 
 models/**
+store_package/** 
