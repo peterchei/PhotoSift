@@ -80,17 +80,36 @@
 
 ## Package Testing (Optional)
 
-Before submitting to the store, you can test your MSIX package locally:
+### Expected Certificate Warning
+⚠️ **Important**: When trying to install the MSIX package locally, you will see this error:
+```
+"This app package's publisher certificate could not be verified. Contact your system 
+administrator or the app developer to obtain a new app package with verified certificates. 
+The root certificate and all immediate certificates of the signature in the app package 
+must be verified (0x800B010A)"
+```
+
+**This is completely normal and expected!** The package is unsigned because:
+- Microsoft Store packages don't need to be pre-signed
+- Microsoft will sign your package during the certification process
+- For local testing, you need Developer Mode enabled
+
+### Testing Your Package Locally
 
 1. **Enable Developer Mode**
    - Go to Windows Settings > Update & Security > For developers
-   - Enable "Developer mode"
+   - Enable "Developer mode" 
+   - This allows installation of unsigned packages for testing
 
 2. **Install Package Locally**
    ```powershell
-   # Install the MSIX package for testing
+   # Install the MSIX package for testing (requires Developer Mode)
    Add-AppxPackage -Path PhotoSift.msix
    ```
+
+3. **Alternative: Install from File Explorer**
+   - Right-click PhotoSift.msix
+   - Select "Install" (only works with Developer Mode enabled)
 
 3. **Test Application**
    - Launch PhotoSift from Start Menu
@@ -186,8 +205,15 @@ Your final MSIX package will contain:
    - Check that all required files exist in store_package directory
    - Ensure AppxManifest.xml is valid
 
-3. **Package Installation Fails (Testing)**
+3. **Certificate Verification Error (Expected)**
+   - Error: "This app package's publisher certificate could not be verified (0x800B010A)"
+   - **This is normal!** The package is unsigned and intended for Microsoft Store submission
+   - Microsoft will sign the package during certification
+   - For local testing: Enable Developer Mode in Windows Settings
+
+4. **Package Installation Fails (Testing)**
    - Enable Developer Mode in Windows Settings
+   - Use PowerShell: `Add-AppxPackage -Path PhotoSift.msix`
    - Check Windows Event Viewer for detailed error messages
    - Verify package manifest has correct capabilities
 
