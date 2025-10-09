@@ -16,7 +16,8 @@ def create_store_assets():
     # Define required sizes for store assets
     sizes = {
         "Square44x44Logo": 44,
-        "Square150x150Logo": 150
+        "Square150x150Logo": 150,
+        "StoreLogo": 50  # Microsoft Store logo size
     }
 
     # Create each required size

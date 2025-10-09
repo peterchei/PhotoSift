@@ -217,6 +217,12 @@ Your final MSIX package will contain:
    - Check Windows Event Viewer for detailed error messages
    - Verify package manifest has correct capabilities
 
+5. **Store Submission Validation Errors (Fixed)**
+   - **Missing Assets**: All required assets (StoreLogo.png, Square44x44Logo.png, Square150x150Logo.png) are now generated automatically
+   - **Publisher Name Mismatch**: Fixed Publisher and PublisherDisplayName to match "PC@AI"
+   - **Missing Language Support**: Added Resources section with en-US language support
+   - **runFullTrust Capability**: This restricted capability is required for desktop apps and will be approved during store review
+
 4. **Store Submission Rejected**
    - Review Microsoft's feedback carefully
    - Common issues: missing privacy policy, inappropriate content ratings

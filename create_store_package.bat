@@ -13,18 +13,21 @@ REM Copy required files to the package directory
 xcopy /y "dist\PhotoSift.exe" "store_package\"
 xcopy /y "resources\app.ico" "store_package\"
 
+REM Create store assets
+python create_store_assets.py
+
 REM Create the AppxManifest.xml
 echo ^<?xml version="1.0" encoding="utf-8"?^> > "store_package\AppxManifest.xml"
 echo ^<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" >> "store_package\AppxManifest.xml"
 echo         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" >> "store_package\AppxManifest.xml"
 echo         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"^> >> "store_package\AppxManifest.xml"
 echo   ^<Identity Name="PhotoSiftApp" >> "store_package\AppxManifest.xml"
-echo            Publisher="CN=YourPublisherName" >> "store_package\AppxManifest.xml"
+echo            Publisher="CN=PC@AI" >> "store_package\AppxManifest.xml"
 echo            Version="1.0.0.0" /^> >> "store_package\AppxManifest.xml"
 echo   ^<Properties^> >> "store_package\AppxManifest.xml"
 echo     ^<DisplayName^>PhotoSift^</DisplayName^> >> "store_package\AppxManifest.xml"
-echo     ^<PublisherDisplayName^>Your Name^</PublisherDisplayName^> >> "store_package\AppxManifest.xml"
-echo     ^<Logo^>Assets\StoreLogo.png^</Logo^> >> "store_package\AppxManifest.xml"
+echo     ^<PublisherDisplayName^>PC@AI^</PublisherDisplayName^> >> "store_package\AppxManifest.xml"
+echo     ^<Logo^>Assets\Square150x150Logo.png^</Logo^> >> "store_package\AppxManifest.xml"
 echo   ^</Properties^> >> "store_package\AppxManifest.xml"
 echo   ^<Dependencies^> >> "store_package\AppxManifest.xml"
 echo     ^<TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0"/^> >> "store_package\AppxManifest.xml"
