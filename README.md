@@ -236,6 +236,16 @@ When contributing to this project, embrace the AI-human collaborative approach:
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request describing the AI-human collaboration process
 
+## Privacy
+
+PhotoSift is designed with privacy as a top priority:
+- **No data collection** - We don't collect any personal information
+- **100% local processing** - All image analysis happens on your device
+- **Offline operation** - No internet connection required after installation
+- **Your photos stay private** - Images never leave your computer
+
+See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for complete details.
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
