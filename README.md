@@ -82,7 +82,34 @@ The build script will:
 
 After a successful build, you'll find:
 - Standalone executable in the `dist` folder
-- Installer package in the `Output` folder
+- Windows installer package in the `Output` folder
+- Microsoft Store package as `PhotoSift.msix`
+
+## Microsoft Store Submission
+
+PhotoSift is designed for easy Microsoft Store submission. The project includes automated tools for creating store-ready packages:
+
+### Quick Store Package Creation
+
+```bash
+# Create store package with all required assets
+.\create_store_package.bat
+
+# Generate store-specific icon assets
+python create_store_assets.py
+
+# Create MSIX package for store submission
+makeappx pack /d store_package /p PhotoSift.msix
+```
+
+### What's Included
+
+- **Automated packaging** - Complete store package structure generation
+- **Asset creation** - Automatically generates required store logos
+- **MSIX format** - Ready-to-submit Microsoft Store package
+- **Manifest configuration** - Properly configured AppxManifest.xml
+
+For detailed Microsoft Store submission instructions, see [`ms-store-submission.md`](ms-store-submission.md).
 
 ## Development Setup
 
@@ -107,15 +134,49 @@ After a successful build, you'll find:
 ```
 PhotoSift/
 ├── src/
-│   ├── ImageClassifierGUI.py    # Main GUI application
-│   ├── ImageClassification.py   # AI classification logic
-│   └── DuplicateImageIdentifier.py
-├── resources/                   # Application resources
-├── models/                     # AI model files
-├── build.bat                   # Build script
-├── setup.py                    # Package configuration
-└── README.md                   # Documentation
+│   ├── ImageClassifierGUI.py           # Main GUI application
+│   ├── ImageClassification.py          # AI classification logic
+│   └── DuplicateImageIdentifier.py     # Duplicate detection module
+├── resources/
+│   └── app.ico                         # Application icon
+├── models/                             # AI model files (downloaded during build)
+├── store_package/                      # Microsoft Store package files
+│   ├── AppxManifest.xml               # Store package manifest
+│   ├── PhotoSift.exe                  # Built application executable
+│   ├── app.ico                        # Application icon copy
+│   └── Assets/                        # Store listing assets
+│       ├── Square44x44Logo.png        # App list icon (44x44)
+│       ├── Square150x150Logo.png      # Medium tile (150x150)
+│       └── StoreLogo.png              # Store listing logo
+├── build_env/                          # Build virtual environment
+├── dist/                              # PyInstaller output directory
+├── build/                             # PyInstaller build cache
+├── Output/                            # Inno Setup installer output
+├── build.bat                          # Main build script
+├── create_store_package.bat           # Microsoft Store package creation
+├── create_store_assets.py             # Store asset generation script
+├── setup.py                           # Package configuration
+├── pyproject.toml                     # Modern Python project config
+├── ms-store-submission.md             # Microsoft Store submission guide
+├── photosift.iss                     # Inno Setup configuration
+├── PhotoSift.msix                     # Microsoft Store package (575MB)
+└── README.md                          # Documentation
 ```
+
+### Key Directories
+
+- **`src/`** - Source code for the main application
+- **`store_package/`** - Complete Microsoft Store package structure
+- **`Assets/`** - Store-specific logos and icons
+- **`dist/`** - Built executable output from PyInstaller
+- **`Output/`** - Windows installer created by Inno Setup
+- **`build_env/`** - Isolated Python environment for building
+
+### Build Artifacts
+
+- **`PhotoSift.exe`** - Main application executable (~576MB)
+- **`PhotoSift.msix`** - Microsoft Store package (~575MB)
+- **`PhotoSift_Setup.exe`** - Windows installer package
 
 ## How It Works
 
