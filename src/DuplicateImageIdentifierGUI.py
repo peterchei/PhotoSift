@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
+import tkinter.ttk as ttk
 from PIL import Image, ImageTk
 import os
 from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
@@ -7,64 +8,269 @@ from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
 class DuplicateImageIdentifierApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Duplicate Image Identifier")
+        self.root.title("PhotoSift - Duplicate Image Identifier")
+        self.root.state('zoomed')  # Start maximized
+        
+        # Modern color scheme (same as ImageClassifierGUI)
+        self.colors = {
+            'bg_primary': '#1e293b',      # Dark blue background
+            'bg_secondary': '#334155',    # Secondary dark blue
+            'bg_card': '#475569',         # Card background
+            'accent': '#3b82f6',          # Blue accent
+            'text_primary': '#f1f5f9',    # White text
+            'text_secondary': '#94a3b8',  # Light gray text
+            'success': '#10b981',         # Green
+            'warning': '#f59e0b',         # Orange
+            'danger': '#ef4444'           # Red
+        }
+        
         self.folder = None
         self.groups = []
         self.setup_ui()
+        self.apply_modern_styling()
 
     def setup_ui(self):
-        import tkinter.ttk as ttk
-        frm = tk.Frame(self.root)
-        frm.pack(fill=tk.X, padx=10, pady=5)
-        tk.Button(frm, text="Select Folder", command=self.select_folder).pack(side=tk.LEFT)
-        self.lbl_folder = tk.Label(frm, text="No folder selected")
-        self.lbl_folder.pack(side=tk.LEFT, padx=10)
+        # Configure main window
+        self.root.configure(bg=self.colors['bg_primary'])
+        
+        # Create modern header
+        self.create_modern_header()
+        
+        # Create main content area
+        self.create_modern_content()
 
-        main_frame = tk.Frame(self.root)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-        main_frame.grid_rowconfigure(0, weight=1)
-        main_frame.grid_columnconfigure(1, weight=1)
+    def create_modern_header(self):
+        # Modern header with better typography
+        header = tk.Frame(self.root, bg=self.colors['bg_primary'], height=80)
+        header.pack(fill=tk.X, padx=20, pady=(20, 0))
+        header.pack_propagate(False)
+        
+        # App title with modern styling
+        title_frame = tk.Frame(header, bg=self.colors['bg_primary'])
+        title_frame.pack(side=tk.LEFT, fill=tk.Y)
+        
+        tk.Label(title_frame, 
+                 text="PhotoSift", 
+                 font=("Segoe UI", 24, "bold"),
+                 bg=self.colors['bg_primary'], 
+                 fg=self.colors['text_primary']).pack(anchor="w")
+        
+        tk.Label(title_frame, 
+                 text="Duplicate Image Identifier", 
+                 font=("Segoe UI", 12),
+                 bg=self.colors['bg_primary'], 
+                 fg=self.colors['text_secondary']).pack(anchor="w")
 
-        # Treeview for groups
-        tree_frame = tk.Frame(main_frame, width=200)
-        tree_frame.grid(row=0, column=0, sticky="ns")
-        tree_scroll = tk.Scrollbar(tree_frame, orient=tk.VERTICAL)
-        tree_xscroll = tk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
-        self.tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll.set, xscrollcommand=tree_xscroll.set)
+    def create_modern_content(self):
+        # Main content container
+        content = tk.Frame(self.root, bg=self.colors['bg_primary'])
+        content.pack(fill=tk.BOTH, expand=True, padx=20)
+        
+        # Create sidebar
+        self.create_modern_sidebar(content)
+        
+        # Create main area
+        self.create_modern_main_area(content)
+
+    def create_modern_sidebar(self, parent):
+        # Modern sidebar
+        sidebar = tk.Frame(parent, bg=self.colors['bg_secondary'], width=280)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 20), pady=(20, 0))
+        sidebar.pack_propagate(False)
+        
+        # Folder selection section
+        folder_section = tk.Frame(sidebar, bg=self.colors['bg_secondary'])
+        folder_section.pack(fill=tk.X, padx=20, pady=(20, 10))
+        
+        tk.Label(folder_section, 
+                text="📁 Select Folder", 
+                font=("Segoe UI", 14, "bold"),
+                bg=self.colors['bg_secondary'], 
+                fg=self.colors['text_primary']).pack(anchor="w", pady=(0, 10))
+        
+        # Modern select folder button
+        self.select_btn = tk.Button(folder_section, 
+                                   text="Select Folder", 
+                                   command=self.select_folder,
+                                   font=("Segoe UI", 11, "bold"),
+                                   bg=self.colors['accent'],
+                                   fg=self.colors['text_primary'],
+                                   activebackground='#2563eb',
+                                   activeforeground=self.colors['text_primary'],
+                                   bd=0,
+                                   padx=20,
+                                   pady=8,
+                                   cursor="hand2")
+        self.select_btn.pack(fill=tk.X)
+        
+        # Folder path display
+        self.lbl_folder = tk.Label(folder_section, 
+                                  text="No folder selected", 
+                                  font=("Segoe UI", 10),
+                                  bg=self.colors['bg_secondary'], 
+                                  fg=self.colors['text_secondary'],
+                                  wraplength=240,
+                                  justify=tk.LEFT)
+        self.lbl_folder.pack(anchor="w", pady=(10, 0))
+        
+        # Groups section
+        groups_section = tk.Frame(sidebar, bg=self.colors['bg_secondary'])
+        groups_section.pack(fill=tk.BOTH, expand=True, padx=20, pady=(20, 0))
+        
+        tk.Label(groups_section, 
+                text="📊 Duplicate Groups", 
+                font=("Segoe UI", 14, "bold"),
+                bg=self.colors['bg_secondary'], 
+                fg=self.colors['text_primary']).pack(anchor="w", pady=(0, 10))
+        
+        # Tree view with modern styling
+        tree_container = tk.Frame(groups_section, bg=self.colors['bg_card'])
+        tree_container.pack(fill=tk.BOTH, expand=True)
+        
+        # Create scrollbars with modern styling
+        tree_scroll = ttk.Scrollbar(tree_container, orient=tk.VERTICAL, style="Modern.Vertical.TScrollbar")
+        tree_xscroll = ttk.Scrollbar(tree_container, orient=tk.HORIZONTAL, style="Modern.Horizontal.TScrollbar")
+        
+        self.tree = ttk.Treeview(tree_container, 
+                               yscrollcommand=tree_scroll.set, 
+                               xscrollcommand=tree_xscroll.set,
+                               style="Modern.Treeview",
+                               show="tree")
+        
         tree_scroll.config(command=self.tree.yview)
         tree_xscroll.config(command=self.tree.xview)
+        
         tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         tree_xscroll.pack(side=tk.BOTTOM, fill=tk.X)
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
         self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+        
+        # Add placeholder text
+        placeholder_id = self.tree.insert("", "end", text="📁 Select a folder to find duplicates", tags=("placeholder",))
 
-        # Center frame for image display
-        center_frame = tk.Frame(main_frame)
-        center_frame.grid(row=0, column=1, sticky="nsew")
-        self.img_panel = tk.Frame(center_frame)
-        self.img_panel.pack(pady=10, fill=tk.BOTH, expand=True)
-        self.lbl_result = tk.Label(center_frame, text="", font=("Arial", 14))
-        self.lbl_result.pack(pady=5)
+    def create_modern_main_area(self, parent):
+        # Main area for image display
+        main_area = tk.Frame(parent, bg=self.colors['bg_primary'])
+        main_area.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, pady=(20, 0))
+        
+        # Image display area with scrolling
+        self.create_image_display_area(main_area)
+        
+        # Result label
+        self.lbl_result = tk.Label(main_area, 
+                                  text="Select a group to view duplicates", 
+                                  font=("Segoe UI", 16, "bold"),
+                                  bg=self.colors['bg_primary'], 
+                                  fg=self.colors['text_primary'])
+        self.lbl_result.pack(pady=(0, 20))
 
-        # Status bar
-        self.status_var = tk.StringVar()
-        self.status_var.set("")
-        self.status_bar = tk.Label(self.root, textvariable=self.status_var, bd=1, relief=tk.SUNKEN, anchor=tk.W, bg="#f0f0f0")
-        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+    def create_image_display_area(self, parent):
+        # Container for scrollable image area
+        img_container = tk.Frame(parent, bg=self.colors['bg_primary'])
+        img_container.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
+        
+        # Canvas for scrolling
+        self.img_canvas = tk.Canvas(img_container, 
+                                   bg=self.colors['bg_primary'],
+                                   highlightthickness=0,
+                                   bd=0)
+        
+        # Modern scrollbar
+        img_scrollbar = ttk.Scrollbar(img_container, 
+                                    orient="vertical", 
+                                    command=self.img_canvas.yview,
+                                    style="Modern.Vertical.TScrollbar")
+        
+        self.img_canvas.configure(yscrollcommand=img_scrollbar.set)
+        
+        img_scrollbar.pack(side="right", fill="y")
+        self.img_canvas.pack(side="left", fill="both", expand=True)
+        
+        # Frame for images
+        self.img_panel = tk.Frame(self.img_canvas, bg=self.colors['bg_primary'])
+        self.img_canvas.create_window((0, 0), window=self.img_panel, anchor="nw")
+        
+        # Bind scrolling
+        self.img_panel.bind("<Configure>", self.on_img_frame_configure)
+        self.img_canvas.bind("<MouseWheel>", self.on_mousewheel)
+
+    def on_img_frame_configure(self, event):
+        self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all"))
+
+    def on_mousewheel(self, event):
+        self.img_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def apply_modern_styling(self):
+        # Configure TTK styles
+        style = ttk.Style()
+        
+        # Set modern theme
+        try:
+            style.theme_use('clam')
+        except:
+            pass
+        
+        # Tree styling
+        style.configure("Modern.Treeview",
+                       rowheight=28,
+                       fieldbackground=self.colors['bg_card'],
+                       background=self.colors['bg_card'],
+                       foreground=self.colors['text_primary'],
+                       selectbackground=self.colors['accent'],
+                       selectforeground=self.colors['text_primary'],
+                       borderwidth=0,
+                       relief="flat")
+        
+        style.map("Modern.Treeview",
+                 background=[('selected', self.colors['accent']),
+                           ('active', self.colors['bg_secondary'])],
+                 foreground=[('selected', self.colors['text_primary']),
+                           ('active', self.colors['text_primary'])])
+        
+        # Scrollbar styling
+        style.configure("Modern.Vertical.TScrollbar",
+                       background=self.colors['bg_secondary'],
+                       troughcolor=self.colors['bg_primary'],
+                       borderwidth=0,
+                       arrowcolor=self.colors['text_secondary'],
+                       darkcolor=self.colors['bg_secondary'],
+                       lightcolor=self.colors['bg_secondary'])
+        
+        style.configure("Modern.Horizontal.TScrollbar",
+                       background=self.colors['bg_secondary'],
+                       troughcolor=self.colors['bg_primary'],
+                       borderwidth=0,
+                       arrowcolor=self.colors['text_secondary'],
+                       darkcolor=self.colors['bg_secondary'],
+                       lightcolor=self.colors['bg_secondary'])
 
     def select_folder(self):
         folder = filedialog.askdirectory()
         if folder:
             self.folder = folder
-            self.lbl_folder.config(text=folder)
+            # Truncate path if too long
+            display_path = folder
+            if len(display_path) > 35:
+                display_path = "..." + display_path[-32:]
+            self.lbl_folder.config(text=display_path, fg=self.colors['text_primary'])
+            
+            # Clear tree
+            self.tree.delete(*self.tree.get_children())
+            
             # Get all image files first
             files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(folder)
                      for f in filenames if os.path.splitext(f)[1].lower() in IMG_EXT]
             total = len(files)
-            self.status_bar.config(bg="#3399ff", fg="white")
-            self.status_var.set(f"Processing 0/{total} images (0%)...")
+            
+            # Clear image panel
+            for widget in self.img_panel.winfo_children():
+                widget.destroy()
+            
+            self.lbl_result.config(text="Processing images...", fg=self.colors['warning'])
             self.root.update_idletasks()
-            # Group similar images with progress (efficient)
+            
+            # Process in thread
             import threading
             def process():
                 from DuplicateImageIdentifier import get_clip_embedding_batch, group_similar_images_clip
@@ -75,9 +281,12 @@ class DuplicateImageIdentifierApp:
                     batch_files = files[start:end]
                     percent = int((end/total)*100) if total else 100
                     print(f"[LOG] Processing images {start+1}-{end}/{total} ({percent}%)")
-                    self.status_var.set(f"Processing images {start+1}-{end}/{total} ({percent}%)")
-                    self.status_bar.config(bg="#3399ff", fg="white")
+                    
+                    # Update result label with progress
+                    self.lbl_result.config(text=f"Processing {start+1}-{end}/{total} ({percent}%)", 
+                                         fg=self.colors['accent'])
                     self.root.update_idletasks()
+                    
                     try:
                         batch_embeddings = get_clip_embedding_batch(batch_files)
                         for f, emb in zip(batch_files, batch_embeddings):
@@ -85,75 +294,161 @@ class DuplicateImageIdentifierApp:
                     except Exception as e:
                         print(f"Error processing batch {start}-{end}: {e}")
                         continue
-                self.status_var.set(f"Done processing {total} images. (100%) | Identifying duplications....")
+                
+                self.lbl_result.config(text="Identifying duplicates...", fg=self.colors['warning'])
                 self.root.update_idletasks()
+                
                 self.groups = group_similar_images_clip(folder=folder, embeddings=embeddings, files=files)
-                self.status_var.set(f"Done processing {total} images. (100%) | Duplicates found: {len(self.groups)}")
-                self.status_bar.config(bg="#33cc33", fg="white")
+                
+                self.lbl_result.config(text=f"Found {len(self.groups)} duplicate groups", 
+                                     fg=self.colors['success'])
                 self.populate_tree()
-            threading.Thread(target=process).start()
+                
+            threading.Thread(target=process, daemon=True).start()
 
     def populate_tree(self):
         import time
         t0 = time.perf_counter()
         print(f"[LOG] Starting tree population: {len(self.groups)} groups")
+        
         self.tree.delete(*self.tree.get_children())
+        
+        if not self.groups:
+            no_duplicates_id = self.tree.insert("", "end", text="✅ No duplicates found", tags=("no_duplicates",))
+            return
+        
         for i, group in enumerate(self.groups, 1):
-            group_node = self.tree.insert("", "end", text=f"Group {i} ({len(group)})", open=True)
+            group_text = f"📂 Group {i} ({len(group)} images)"
+            group_node = self.tree.insert("", "end", text=group_text, open=False)
+            
             if len(group) > 100:
                 print(f"[LOG] Group {i} is large ({len(group)} images), inserting in chunks...")
                 chunk_size = 100
                 for start in range(0, len(group), chunk_size):
                     end = min(start + chunk_size, len(group))
                     for img_path in group[start:end]:
-                        self.tree.insert(group_node, "end", text=os.path.basename(img_path), values=(img_path,))
+                        filename = os.path.basename(img_path)
+                        self.tree.insert(group_node, "end", text=f"🖼️ {filename}", values=(img_path,))
             else:
                 for img_path in group:
-                    self.tree.insert(group_node, "end", text=os.path.basename(img_path), values=(img_path,))
+                    filename = os.path.basename(img_path)
+                    self.tree.insert(group_node, "end", text=f"🖼️ {filename}", values=(img_path,))
+        
         print(f"[LOG] Finished tree population in {time.perf_counter()-t0:.2f}s")
 
     def on_tree_select(self, event):
         selected = self.tree.selection()
         if not selected:
             return
+        
         item = self.tree.item(selected[0])
+        
+        # Clear previous images
+        for widget in self.img_panel.winfo_children():
+            widget.destroy()
+        
         # If group node (no 'values'), show all images in group
         if not ('values' in item and item['values']):
-            # Clear previous thumbnails
-            for widget in self.img_panel.winfo_children():
-                widget.destroy()
+            if "No duplicates found" in item['text'] or "Select a folder" in item['text']:
+                return
+                
             # Find group images
             children = self.tree.get_children(selected[0])
             images = []
+            
             for child in children:
-                img_path = self.tree.item(child)['values'][0]
-                try:
-                    img = Image.open(img_path).resize((120, 90))
-                    img_tk = ImageTk.PhotoImage(img)
-                    images.append((img_tk, img_path))
-                except Exception:
-                    continue
-            # Display thumbnails
-            for idx, (img_tk, img_path) in enumerate(images):
-                frame = tk.Frame(self.img_panel)
-                frame.grid(row=idx//4, column=idx%4, padx=5, pady=5)
-                lbl_img = tk.Label(frame, image=img_tk)
-                lbl_img.image = img_tk
-                lbl_img.pack()
-                lbl_name = tk.Label(frame, text=os.path.basename(img_path), font=("Arial", 10))
-                lbl_name.pack()
-            self.lbl_result.config(text=f"Group: {item['text']}")
-        # If leaf node, show single image
+                child_item = self.tree.item(child)
+                if 'values' in child_item and child_item['values']:
+                    img_path = child_item['values'][0]
+                    try:
+                        img = Image.open(img_path)
+                        img.thumbnail((180, 135), Image.Resampling.LANCZOS)
+                        img_tk = ImageTk.PhotoImage(img)
+                        images.append((img_tk, img_path))
+                    except Exception as e:
+                        print(f"Error loading image {img_path}: {e}")
+                        continue
+            
+            # Calculate grid layout
+            if images:
+                canvas_width = self.img_canvas.winfo_width() or 800
+                cols = max(1, (canvas_width - 40) // 200)  # 200px per thumbnail + spacing
+                
+                # Display thumbnails in modern cards
+                for idx, (img_tk, img_path) in enumerate(images):
+                    row = idx // cols
+                    col = idx % cols
+                    
+                    # Modern card frame
+                    card = tk.Frame(self.img_panel, 
+                                   bg=self.colors['bg_card'], 
+                                   bd=0,
+                                   highlightbackground=self.colors['bg_secondary'],
+                                   highlightthickness=1,
+                                   relief=tk.SOLID)
+                    card.grid(row=row, column=col, padx=10, pady=10, sticky='nsew')
+                    
+                    # Image container with padding
+                    img_container = tk.Frame(card, bg=self.colors['bg_card'])
+                    img_container.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+                    
+                    # Image label
+                    lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
+                    lbl_img.image = img_tk  # Keep reference
+                    lbl_img.pack()
+                    
+                    # Filename label
+                    filename = os.path.basename(img_path)
+                    if len(filename) > 20:
+                        filename = filename[:17] + "..."
+                    
+                    lbl_name = tk.Label(img_container, 
+                                       text=filename, 
+                                       font=("Segoe UI", 10),
+                                       bg=self.colors['bg_card'],
+                                       fg=self.colors['text_primary'],
+                                       wraplength=180)
+                    lbl_name.pack(pady=(5, 0))
+                    
+                    # Hover effects
+                    def on_enter(e, card=card):
+                        card.configure(highlightbackground=self.colors['accent'], highlightthickness=2)
+                    
+                    def on_leave(e, card=card):
+                        card.configure(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
+                    
+                    card.bind("<Enter>", on_enter)
+                    card.bind("<Leave>", on_leave)
+                    lbl_img.bind("<Enter>", on_enter)
+                    lbl_img.bind("<Leave>", on_leave)
+                    lbl_name.bind("<Enter>", on_enter)
+                    lbl_name.bind("<Leave>", on_leave)
+                
+                self.lbl_result.config(text=f"Group: {item['text']} - {len(images)} images", 
+                                     fg=self.colors['text_primary'])
+                
+        # If leaf node, show single image enlarged
         elif 'values' in item and item['values']:
             path = item['values'][0]
-            for widget in self.img_panel.winfo_children():
-                widget.destroy()
-            img = Image.open(path).resize((400, 300))
-            img_tk = ImageTk.PhotoImage(img)
-            lbl = tk.Label(self.img_panel, image=img_tk)
-            lbl.image = img_tk
-            lbl.pack()
-            self.lbl_result.config(text=os.path.basename(path))
+            try:
+                img = Image.open(path)
+                img.thumbnail((600, 450), Image.Resampling.LANCZOS)
+                img_tk = ImageTk.PhotoImage(img)
+                
+                # Center the single image
+                single_frame = tk.Frame(self.img_panel, bg=self.colors['bg_primary'])
+                single_frame.pack(expand=True, fill=tk.BOTH)
+                
+                lbl = tk.Label(single_frame, image=img_tk, bg=self.colors['bg_primary'])
+                lbl.image = img_tk
+                lbl.pack(expand=True)
+                
+                self.lbl_result.config(text=os.path.basename(path), fg=self.colors['text_primary'])
+            except Exception as e:
+                self.lbl_result.config(text=f"Error loading image: {e}", fg=self.colors['danger'])
+        
+        # Update scroll region
+        self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
 
 if __name__ == "__main__":
     root = tk.Tk()
