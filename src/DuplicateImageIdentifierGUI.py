@@ -130,7 +130,8 @@ class DuplicateImageIdentifierApp:
                                yscrollcommand=tree_scroll.set, 
                                xscrollcommand=tree_xscroll.set,
                                style="Modern.Treeview",
-                               show="tree")
+                               show="tree",
+                               selectmode="extended")
         
         tree_scroll.config(command=self.tree.yview)
         tree_xscroll.config(command=self.tree.xview)
@@ -486,11 +487,124 @@ class DuplicateImageIdentifierApp:
         if not selected:
             return
         
-        item = self.tree.item(selected[0])
-        
         # Clear previous images
         for widget in self.img_panel.winfo_children():
             widget.destroy()
+        
+        # Handle multiple selection
+        if len(selected) > 1:
+            self.display_multiple_groups(selected)
+        else:
+            self.display_single_selection(selected[0])
+        
+        # Update scroll region
+        self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
+    
+    def display_multiple_groups(self, selected_items):
+        """Display images from multiple selected groups, each group in its own row"""
+        total_images = 0
+        current_row = 0
+        
+        for item_id in selected_items:
+            item = self.tree.item(item_id)
+            
+            # Skip if not a group node or if it's a placeholder
+            if ('values' in item and item['values']) or "No duplicates found" in item['text'] or "Select a folder" in item['text']:
+                continue
+            
+            # Get group name
+            group_name = item['text']
+            
+            # Create group header
+            group_header = tk.Frame(self.img_panel, bg=self.colors['bg_secondary'], height=40)
+            group_header.grid(row=current_row, column=0, columnspan=10, sticky='ew', padx=5, pady=(5, 0))
+            group_header.grid_propagate(False)
+            
+            header_label = tk.Label(group_header, 
+                                   text=f"📂 {group_name}", 
+                                   font=("Segoe UI", 12, "bold"),
+                                   bg=self.colors['bg_secondary'],
+                                   fg=self.colors['text_primary'])
+            header_label.pack(side=tk.LEFT, padx=10, pady=8)
+            
+            current_row += 1
+            
+            # Get images for this group
+            children = self.tree.get_children(item_id)
+            group_images = []
+            
+            for child in children:
+                child_item = self.tree.item(child)
+                if 'values' in child_item and child_item['values']:
+                    img_path = child_item['values'][0]
+                    try:
+                        img = Image.open(img_path)
+                        img.thumbnail((150, 120), Image.Resampling.LANCZOS)
+                        img_tk = ImageTk.PhotoImage(img)
+                        group_images.append((img_tk, img_path))
+                    except Exception as e:
+                        print(f"Error loading image {img_path}: {e}")
+                        continue
+            
+            # Display images in a single row for this group
+            if group_images:
+                images_frame = tk.Frame(self.img_panel, bg=self.colors['bg_primary'])
+                images_frame.grid(row=current_row, column=0, columnspan=10, sticky='ew', padx=5, pady=(0, 10))
+                
+                for col, (img_tk, img_path) in enumerate(group_images):
+                    # Create image card
+                    card = tk.Frame(images_frame, 
+                                   bg=self.colors['bg_card'], 
+                                   bd=0,
+                                   highlightbackground=self.colors['bg_secondary'],
+                                   highlightthickness=1,
+                                   relief=tk.SOLID)
+                    card.grid(row=0, column=col, padx=5, pady=5, sticky='nsew')
+                    
+                    # Image container
+                    img_container = tk.Frame(card, bg=self.colors['bg_card'])
+                    img_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+                    
+                    # Image label
+                    lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
+                    lbl_img.image = img_tk
+                    lbl_img.pack()
+                    
+                    # Filename label
+                    filename = os.path.basename(img_path)
+                    if len(filename) > 15:
+                        filename = filename[:12] + "..."
+                    
+                    lbl_name = tk.Label(img_container, 
+                                       text=filename, 
+                                       font=("Segoe UI", 9),
+                                       bg=self.colors['bg_card'],
+                                       fg=self.colors['text_primary'],
+                                       wraplength=150)
+                    lbl_name.pack(pady=(3, 0))
+                    
+                    # Hover effects
+                    def on_enter(e, card=card):
+                        card.configure(highlightbackground=self.colors['accent'], highlightthickness=2)
+                    
+                    def on_leave(e, card=card):
+                        card.configure(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
+                    
+                    for widget in [card, lbl_img, lbl_name]:
+                        widget.bind("<Enter>", on_enter)
+                        widget.bind("<Leave>", on_leave)
+                
+                total_images += len(group_images)
+                current_row += 1
+        
+        # Update result label and status
+        self.lbl_result.config(text=f"Viewing {len(selected_items)} duplicate groups - {total_images} total images", 
+                             fg=self.colors['text_primary'])
+        self.status_var.set(f"Viewing {len(selected_items)} duplicate groups with {total_images} images")
+    
+    def display_single_selection(self, item_id):
+        """Display images from a single selected group or single image"""
+        item = self.tree.item(item_id)
         
         # If group node (no 'values'), show all images in group
         if not ('values' in item and item['values']):
@@ -498,7 +612,7 @@ class DuplicateImageIdentifierApp:
                 return
                 
             # Find group images
-            children = self.tree.get_children(selected[0])
+            children = self.tree.get_children(item_id)
             images = []
             
             for child in children:
@@ -514,12 +628,11 @@ class DuplicateImageIdentifierApp:
                         print(f"Error loading image {img_path}: {e}")
                         continue
             
-            # Calculate grid layout
+            # Display thumbnails in grid layout
             if images:
                 canvas_width = self.img_canvas.winfo_width() or 800
-                cols = max(1, (canvas_width - 40) // 200)  # 200px per thumbnail + spacing
+                cols = max(1, (canvas_width - 40) // 200)
                 
-                # Display thumbnails in modern cards
                 for idx, (img_tk, img_path) in enumerate(images):
                     row = idx // cols
                     col = idx % cols
@@ -539,7 +652,7 @@ class DuplicateImageIdentifierApp:
                     
                     # Image label
                     lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
-                    lbl_img.image = img_tk  # Keep reference
+                    lbl_img.image = img_tk
                     lbl_img.pack()
                     
                     # Filename label
@@ -562,17 +675,12 @@ class DuplicateImageIdentifierApp:
                     def on_leave(e, card=card):
                         card.configure(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
                     
-                    card.bind("<Enter>", on_enter)
-                    card.bind("<Leave>", on_leave)
-                    lbl_img.bind("<Enter>", on_enter)
-                    lbl_img.bind("<Leave>", on_leave)
-                    lbl_name.bind("<Enter>", on_enter)
-                    lbl_name.bind("<Leave>", on_leave)
+                    for widget in [card, lbl_img, lbl_name]:
+                        widget.bind("<Enter>", on_enter)
+                        widget.bind("<Leave>", on_leave)
                 
                 self.lbl_result.config(text=f"Group: {item['text']} - {len(images)} images", 
                                      fg=self.colors['text_primary'])
-                
-                # Update status bar when viewing a group
                 self.status_var.set(f"Viewing duplicate group with {len(images)} similar images")
                 
         # If leaf node, show single image enlarged
@@ -592,14 +700,9 @@ class DuplicateImageIdentifierApp:
                 lbl.pack(expand=True)
                 
                 self.lbl_result.config(text=os.path.basename(path), fg=self.colors['text_primary'])
-                
-                # Update status bar when viewing a single image
                 self.status_var.set(f"Viewing: {os.path.basename(path)}")
             except Exception as e:
                 self.lbl_result.config(text=f"Error loading image: {e}", fg=self.colors['danger'])
-        
-        # Update scroll region
-        self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
 
 if __name__ == "__main__":
     root = tk.Tk()
