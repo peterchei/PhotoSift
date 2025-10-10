@@ -201,6 +201,70 @@ class DuplicateImageIdentifierApp:
     def on_mousewheel(self, event):
         self.img_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
+    def show_progress_window(self, total):
+        # Create modern progress window
+        self.progress_window = tk.Toplevel(self.root)
+        self.progress_window.title("Processing Images - Duplicate Detection")
+        self.progress_window.geometry("450x180")
+        self.progress_window.transient(self.root)
+        self.progress_window.grab_set()
+        
+        # Center the progress window
+        window_width = 450
+        window_height = 180
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        self.progress_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        
+        # Modern progress window styling
+        self.progress_window.configure(bg=self.colors['bg_primary'])
+        frame = tk.Frame(self.progress_window, bg=self.colors['bg_primary'], padx=30, pady=25)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Modern progress label
+        self.progress_label = tk.Label(frame, 
+                                      text="Initializing Duplicate Detection...", 
+                                      font=("Segoe UI", 13, "bold"), 
+                                      bg=self.colors['bg_primary'],
+                                      fg=self.colors['text_primary'])
+        self.progress_label.pack(pady=(0, 15))
+        
+        # Modern progress bar
+        self.progress_var = tk.DoubleVar()
+        style = ttk.Style()
+        style.configure("Modern.Horizontal.TProgressbar", 
+                       thickness=20, 
+                       background=self.colors['accent'],
+                       troughcolor=self.colors['bg_secondary'],
+                       borderwidth=0)
+        self.progress_bar = ttk.Progressbar(frame, 
+                                          style="Modern.Horizontal.TProgressbar", 
+                                          length=390, mode='determinate', 
+                                          maximum=total, variable=self.progress_var)
+        self.progress_bar.pack(pady=(0, 15))
+        
+        # Modern detailed status
+        self.progress_detail = tk.Label(frame, 
+                                       text="", 
+                                       font=("Segoe UI", 11), 
+                                       bg=self.colors['bg_primary'], 
+                                       fg=self.colors['text_secondary'])
+        self.progress_detail.pack()
+
+    def update_progress(self, current, total, status_text, detail_text=""):
+        if hasattr(self, 'progress_window') and self.progress_window.winfo_exists():
+            self.progress_var.set(current)
+            self.progress_label.config(text=status_text)
+            if detail_text:
+                self.progress_detail.config(text=detail_text)
+            self.progress_window.update_idletasks()
+
+    def close_progress(self):
+        if hasattr(self, 'progress_window') and self.progress_window.winfo_exists():
+            self.progress_window.destroy()
+
     def apply_modern_styling(self):
         # Configure TTK styles
         style = ttk.Style()
@@ -263,46 +327,76 @@ class DuplicateImageIdentifierApp:
                      for f in filenames if os.path.splitext(f)[1].lower() in IMG_EXT]
             total = len(files)
             
+            if total == 0:
+                messagebox.showinfo("No Images", "No images found in the selected folder.")
+                return
+            
             # Clear image panel
             for widget in self.img_panel.winfo_children():
                 widget.destroy()
             
-            self.lbl_result.config(text="Processing images...", fg=self.colors['warning'])
-            self.root.update_idletasks()
+            # Show progress window
+            self.show_progress_window(total)
             
             # Process in thread
             import threading
             def process():
-                from DuplicateImageIdentifier import get_clip_embedding_batch, group_similar_images_clip
-                embeddings = {}
-                batch_size = 64
-                for start in range(0, total, batch_size):
-                    end = min(start + batch_size, total)
-                    batch_files = files[start:end]
-                    percent = int((end/total)*100) if total else 100
-                    print(f"[LOG] Processing images {start+1}-{end}/{total} ({percent}%)")
+                try:
+                    from DuplicateImageIdentifier import get_clip_embedding_batch, group_similar_images_clip
+                    embeddings = {}
+                    batch_size = 64
                     
-                    # Update result label with progress
-                    self.lbl_result.config(text=f"Processing {start+1}-{end}/{total} ({percent}%)", 
-                                         fg=self.colors['accent'])
-                    self.root.update_idletasks()
+                    # Process images in batches
+                    for start in range(0, total, batch_size):
+                        end = min(start + batch_size, total)
+                        batch_files = files[start:end]
+                        percent = int((end/total)*100) if total else 100
+                        
+                        print(f"[LOG] Processing images {start+1}-{end}/{total} ({percent}%)")
+                        
+                        # Update progress window
+                        status_text = f"Processing Images ({percent}%)"
+                        detail_text = f"Analyzing batch {start+1}-{end} of {total} images..."
+                        self.update_progress(end, total, status_text, detail_text)
+                        
+                        try:
+                            batch_embeddings = get_clip_embedding_batch(batch_files)
+                            for f, emb in zip(batch_files, batch_embeddings):
+                                embeddings[f] = emb
+                        except Exception as e:
+                            print(f"Error processing batch {start}-{end}: {e}")
+                            continue
                     
-                    try:
-                        batch_embeddings = get_clip_embedding_batch(batch_files)
-                        for f, emb in zip(batch_files, batch_embeddings):
-                            embeddings[f] = emb
-                    except Exception as e:
-                        print(f"Error processing batch {start}-{end}: {e}")
-                        continue
-                
-                self.lbl_result.config(text="Identifying duplicates...", fg=self.colors['warning'])
-                self.root.update_idletasks()
-                
-                self.groups = group_similar_images_clip(folder=folder, embeddings=embeddings, files=files)
-                
-                self.lbl_result.config(text=f"Found {len(self.groups)} duplicate groups", 
-                                     fg=self.colors['success'])
-                self.populate_tree()
+                    # Update progress for duplicate detection phase
+                    self.update_progress(total, total, "Identifying Duplicates...", 
+                                       "Comparing image similarities and grouping duplicates...")
+                    
+                    self.groups = group_similar_images_clip(folder=folder, embeddings=embeddings, files=files)
+                    
+                    # Update final status
+                    final_status = f"Complete! Found {len(self.groups)} duplicate groups"
+                    final_detail = f"Processed {total} images successfully"
+                    self.update_progress(total, total, final_status, final_detail)
+                    
+                    # Update main UI
+                    self.lbl_result.config(text=f"Found {len(self.groups)} duplicate groups", 
+                                         fg=self.colors['success'])
+                    self.populate_tree()
+                    
+                    # Close progress window after a short delay
+                    self.root.after(2000, self.close_progress)
+                    
+                except Exception as e:
+                    # Handle errors gracefully
+                    error_msg = f"Error during processing: {str(e)}"
+                    print(f"[ERROR] {error_msg}")
+                    
+                    self.update_progress(0, total, "Processing Failed", error_msg)
+                    self.lbl_result.config(text="Processing failed. Check console for details.", 
+                                         fg=self.colors['danger'])
+                    
+                    # Close progress window after error
+                    self.root.after(3000, self.close_progress)
                 
             threading.Thread(target=process, daemon=True).start()
 
