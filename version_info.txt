@@ -36,7 +36,7 @@ VSVersionInfo(
         StringStruct(u'LegalCopyright', u'Copyright (c) 2025'),
         StringStruct(u'OriginalFilename', u'PhotoSift.exe'),
         StringStruct(u'ProductName', u'PhotoSift'),
-        StringStruct(u'ProductVersion', u'1.1.0')]))
+        StringStruct(u'ProductVersion', u'1.1.0')])
       ]), 
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
   ]
