@@ -264,13 +264,18 @@ class ImageClassifierApp:
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 14))
         tree_scroll = tk.Scrollbar(tree_frame, orient=tk.VERTICAL)
         tree_xscroll = tk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
-        self.tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll.set, xscrollcommand=tree_xscroll.set, selectmode="extended")
+        self.tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll.set, xscrollcommand=tree_xscroll.set, selectmode="extended", show="tree")
         tree_scroll.config(command=self.tree.yview)
         tree_xscroll.config(command=self.tree.xview)
         tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         tree_xscroll.pack(side=tk.BOTTOM, fill=tk.X)
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+        
+        # Configure tree styling to remove empty lines
+        tree_style = ttk.Style()
+        tree_style.configure("Treeview", rowheight=20, fieldbackground="#e9ecf2")
+        tree_style.configure("Treeview.Item", padding=(2, 0, 2, 0))
 
         # Card-like main content area with rounded corners and shadow
         card = tk.Frame(main_frame, bg="#f9fafb", bd=0, highlightbackground="#dbeafe", highlightthickness=2)
