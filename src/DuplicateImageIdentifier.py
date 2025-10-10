@@ -57,47 +57,56 @@ def group_similar_images_clip(folder=None, threshold=0.95, embeddings=None, file
         emb_array = get_clip_embedding_batch(files)
         embeddings = {f: emb_array[i] for i, f in enumerate(files)}
     
+    # Convert embeddings to numpy array for vectorized operations
+    file_list = list(files)
+    embedding_matrix = np.array([embeddings[f] for f in file_list])
+    
+    # Normalize embeddings once for cosine similarity
+    norms = np.linalg.norm(embedding_matrix, axis=1, keepdims=True)
+    normalized_embeddings = embedding_matrix / norms
+    
+    # Compute full similarity matrix using vectorized operations
+    if progress_callback:
+        progress_callback(0, len(file_list), "Computing Similarity Matrix...", 
+                        "Calculating all pairwise similarities using vectorized operations...")
+    
+    similarity_matrix = np.dot(normalized_embeddings, normalized_embeddings.T)
+    
+    # Find duplicate groups using the precomputed similarity matrix
     groups = []
     used = set()
-    total_files = len(files)
-    processed_files = 0
+    total_files = len(file_list)
     
-    for f1 in files:
-        if f1 in used:
-            processed_files += 1
-            if progress_callback:
-                percent = int((processed_files / total_files) * 100)
-                progress_callback(processed_files, total_files, f"Identifying Duplicates... ({percent}%)", 
-                                f"Comparing image {processed_files}/{total_files}: {os.path.basename(f1)}")
+    for i, f1 in enumerate(file_list):
+        if i in used:
             continue
             
-        group = [f1]
-        emb1 = embeddings[f1]
-        comparisons_made = 0
-        for f2 in files:
-            if f2 == f1 or f2 in used:
-                continue
-            emb2 = embeddings[f2]
-            sim = np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2))
-            if sim >= threshold:
-                group.append(f2)
-                used.add(f2)
-            
-            # Update progress every few comparisons for responsiveness
-            comparisons_made += 1
-            if progress_callback and comparisons_made % 50 == 0:
-                percent = int((processed_files / total_files) * 100)
-                progress_callback(processed_files, total_files, f"Identifying Duplicates... ({percent}%)", 
-                                f"Comparing {os.path.basename(f1)} with others... ({comparisons_made} comparisons)")
-        used.add(f1)
-        if len(group) > 1:
+        # Find all similar images for this one using the precomputed matrix
+        similar_indices = np.where(similarity_matrix[i] >= threshold)[0]
+        
+        # Filter out already used indices and self
+        group_indices = [idx for idx in similar_indices if idx not in used and idx != i]
+        
+        if len(group_indices) > 0:  # Only create group if there are duplicates
+            group = [f1] + [file_list[idx] for idx in group_indices]
             groups.append(group)
             
-        processed_files += 1
-        if progress_callback:
-            percent = int((processed_files / total_files) * 100)
-            progress_callback(processed_files, total_files, f"Identifying Duplicates... ({percent}%)", 
-                            f"Comparing image {processed_files}/{total_files}: {os.path.basename(f1)}")
+            # Mark all images in this group as used
+            used.add(i)
+            used.update(group_indices)
+        else:
+            used.add(i)
+        
+        # Progress update
+        if progress_callback and (i + 1) % 50 == 0:
+            percent = int(((i + 1) / total_files) * 100)
+            progress_callback(i + 1, total_files, f"Grouping Duplicates... ({percent}%)", 
+                            f"Processed {i + 1}/{total_files} images: {os.path.basename(f1)}")
+    
+    # Final progress update
+    if progress_callback:
+        progress_callback(total_files, total_files, "Duplicate Grouping Complete!", 
+                        f"Found {len(groups)} duplicate groups from {total_files} images")
     
     return groups
 

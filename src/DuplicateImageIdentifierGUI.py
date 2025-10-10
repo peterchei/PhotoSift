@@ -110,10 +110,10 @@ class DuplicateImageIdentifierApp:
         
         # Groups section
         groups_section = tk.Frame(sidebar, bg=self.colors['bg_secondary'])
-        groups_section.pack(fill=tk.BOTH, expand=True, padx=20, pady=(20, 0))
+        groups_section.pack(fill=tk.BOTH, expand=True, padx=20, pady=(5, 0))
         
         tk.Label(groups_section, 
-                text="📊 Duplicate Groups", 
+                text="Duplications", 
                 font=("Segoe UI", 14, "bold"),
                 bg=self.colors['bg_secondary'], 
                 fg=self.colors['text_primary']).pack(anchor="w", pady=(0, 10))
