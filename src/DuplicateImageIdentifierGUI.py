@@ -388,7 +388,15 @@ class DuplicateImageIdentifierApp:
                                        "Comparing image similarities and grouping duplicates...")
                     self.root.after(0, self.status_var.set, "Identifying duplicate groups...")
                     
-                    self.groups = group_similar_images_clip(folder=folder, embeddings=embeddings, files=files)
+                    # Define progress callback for duplicate detection
+                    def duplicate_progress_callback(current, total_imgs, status_text, detail_text):
+                        self.root.after(0, self.update_progress, current, total_imgs, status_text, detail_text)
+                        percent = int((current / total_imgs) * 100) if total_imgs > 0 else 100
+                        status_bar_text = f"Identifying duplicates: {current}/{total_imgs} ({percent}%)"
+                        self.root.after(0, self.status_var.set, status_bar_text)
+                    
+                    self.groups = group_similar_images_clip(folder=folder, embeddings=embeddings, files=files, 
+                                                          progress_callback=duplicate_progress_callback)
                     
                     # Update final status
                     final_status = f"Complete! Found {len(self.groups)} duplicate groups"

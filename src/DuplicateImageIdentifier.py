@@ -47,7 +47,7 @@ def get_clip_embedding(img_path):
         image_features = model.get_image_features(**{k: v.to(device) for k, v in inputs.items()})
     return image_features.squeeze().cpu().numpy()
 
-def group_similar_images_clip(folder=None, threshold=0.95, embeddings=None, files=None):
+def group_similar_images_clip(folder=None, threshold=0.95, embeddings=None, files=None, progress_callback=None):
     # Accept precomputed embeddings and file list for efficiency
     if files is None:
         files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(folder)
@@ -56,13 +56,24 @@ def group_similar_images_clip(folder=None, threshold=0.95, embeddings=None, file
         # Use batch embedding extraction for all files
         emb_array = get_clip_embedding_batch(files)
         embeddings = {f: emb_array[i] for i, f in enumerate(files)}
+    
     groups = []
     used = set()
+    total_files = len(files)
+    processed_files = 0
+    
     for f1 in files:
         if f1 in used:
+            processed_files += 1
+            if progress_callback:
+                percent = int((processed_files / total_files) * 100)
+                progress_callback(processed_files, total_files, f"Identifying Duplicates... ({percent}%)", 
+                                f"Comparing image {processed_files}/{total_files}: {os.path.basename(f1)}")
             continue
+            
         group = [f1]
         emb1 = embeddings[f1]
+        comparisons_made = 0
         for f2 in files:
             if f2 == f1 or f2 in used:
                 continue
@@ -71,9 +82,23 @@ def group_similar_images_clip(folder=None, threshold=0.95, embeddings=None, file
             if sim >= threshold:
                 group.append(f2)
                 used.add(f2)
+            
+            # Update progress every few comparisons for responsiveness
+            comparisons_made += 1
+            if progress_callback and comparisons_made % 50 == 0:
+                percent = int((processed_files / total_files) * 100)
+                progress_callback(processed_files, total_files, f"Identifying Duplicates... ({percent}%)", 
+                                f"Comparing {os.path.basename(f1)} with others... ({comparisons_made} comparisons)")
         used.add(f1)
         if len(group) > 1:
             groups.append(group)
+            
+        processed_files += 1
+        if progress_callback:
+            percent = int((processed_files / total_files) * 100)
+            progress_callback(processed_files, total_files, f"Identifying Duplicates... ({percent}%)", 
+                            f"Comparing image {processed_files}/{total_files}: {os.path.basename(f1)}")
+    
     return groups
 
 if __name__ == "__main__":
