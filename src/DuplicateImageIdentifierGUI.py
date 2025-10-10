@@ -399,17 +399,19 @@ class DuplicateImageIdentifierApp:
                                                           progress_callback=duplicate_progress_callback)
                     
                     # Update final status
-                    final_status = f"Complete! Found {len(self.groups)} duplicate groups"
-                    final_detail = f"Processed {total} images successfully"
+                    total_duplicates = sum(len(group) - 1 for group in self.groups)
+                    final_status = f"Complete! Found {len(self.groups)} images with duplicates"
+                    final_detail = f"Processed {total} images - {total_duplicates} total duplicates found"
                     self.update_progress(total, total, final_status, final_detail)
                     
                     # Update status bar with final result
-                    final_status_text = f"Done! Found {len(self.groups)} duplicate groups from {total} images (100%)"
+                    final_status_text = f"Done! {len(self.groups)} images have duplicates ({total_duplicates} total) from {total} images (100%)"
                     self.root.after(0, self.status_var.set, final_status_text)
                     self.root.after(0, self.status_bar.config, {"bg": "#33cc33", "fg": "white"})
                     
                     # Update main UI
-                    self.lbl_result.config(text=f"Found {len(self.groups)} duplicate groups", 
+                    total_duplicates = sum(len(group) - 1 for group in self.groups)
+                    self.lbl_result.config(text=f"Found {len(self.groups)} images with duplicates ({total_duplicates} total duplicates)", 
                                          fg=self.colors['success'])
                     self.populate_tree()
                     
@@ -440,7 +442,8 @@ class DuplicateImageIdentifierApp:
         print(f"[LOG] Starting tree population: {len(self.groups)} groups")
         
         # Update status bar for tree population
-        self.status_var.set(f"Building tree view for {len(self.groups)} duplicate groups...")
+        total_duplicates = sum(len(group) - 1 for group in self.groups)
+        self.status_var.set(f"Building tree view for {len(self.groups)} images with duplicates...")
         
         self.tree.delete(*self.tree.get_children())
         
@@ -449,7 +452,10 @@ class DuplicateImageIdentifierApp:
             return
         
         for i, group in enumerate(self.groups, 1):
-            group_text = f"📂 Group {i} ({len(group)} images)"
+            # Use first filename as the group name with duplicate count
+            first_filename = os.path.basename(group[0])
+            duplicate_count = len(group) - 1  # Number of duplicates (excluding the original)
+            group_text = f"📂 {first_filename} ({duplicate_count} duplicate{'s' if duplicate_count != 1 else ''})"
             group_node = self.tree.insert("", "end", text=group_text, open=False)
             
             if len(group) > 100:
@@ -470,7 +476,8 @@ class DuplicateImageIdentifierApp:
         # Update status bar when tree population is complete
         if len(self.groups) > 0:
             total_images = sum(len(group) for group in self.groups)
-            self.status_var.set(f"Ready - {len(self.groups)} duplicate groups with {total_images} images")
+            total_duplicates = sum(len(group) - 1 for group in self.groups)
+            self.status_var.set(f"Ready - {len(self.groups)} images have duplicates ({total_duplicates} total duplicates)")
         else:
             self.status_var.set("No duplicates found - all images are unique")
 
