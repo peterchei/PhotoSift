@@ -26,6 +26,13 @@ class DuplicateImageIdentifierApp:
         
         self.folder = None
         self.groups = []
+        
+        # Thumbnail size configuration for zoom functionality
+        self.thumb_size = (180, 135)  # Default size for single group view
+        self.multi_thumb_size = (150, 120)  # Default size for multi-group view
+        self.min_thumb_size = (80, 60)  # Minimum size
+        self.max_thumb_size = (300, 225)  # Maximum size
+        
         self.setup_ui()
         self.apply_modern_styling()
         self.create_status_bar()
@@ -61,6 +68,39 @@ class DuplicateImageIdentifierApp:
                  font=("Segoe UI", 12),
                  bg=self.colors['bg_primary'], 
                  fg=self.colors['text_secondary']).pack(anchor="w")
+        
+        # Zoom controls on the right side
+        zoom_frame = tk.Frame(header, bg=self.colors['bg_primary'])
+        zoom_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.zoom_out_btn = tk.Button(zoom_frame, 
+                                     text="🔍-", 
+                                     command=self.zoom_out,
+                                     font=("Segoe UI", 14),
+                                     bg=self.colors['bg_secondary'],
+                                     fg=self.colors['text_primary'],
+                                     activebackground=self.colors['bg_card'],
+                                     bd=0, relief=tk.FLAT, cursor="hand2",
+                                     padx=12, pady=8)
+        self.zoom_out_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.zoom_in_btn = tk.Button(zoom_frame, 
+                                    text="🔍+", 
+                                    command=self.zoom_in,
+                                    font=("Segoe UI", 14),
+                                    bg=self.colors['bg_secondary'],
+                                    fg=self.colors['text_primary'],
+                                    activebackground=self.colors['bg_card'],
+                                    bd=0, relief=tk.FLAT, cursor="hand2",
+                                    padx=12, pady=8)
+        self.zoom_in_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        self.zoom_label = tk.Label(zoom_frame, 
+                                  text="100%", 
+                                  font=("Segoe UI", 12), 
+                                  bg=self.colors['bg_primary'], 
+                                  fg=self.colors['text_secondary'])
+        self.zoom_label.pack(side=tk.LEFT, fill=tk.Y)
 
     def create_modern_content(self):
         # Main content container
@@ -481,6 +521,9 @@ class DuplicateImageIdentifierApp:
             self.status_var.set(f"Ready - {len(self.groups)} images have duplicates ({total_duplicates} total duplicates)")
         else:
             self.status_var.set("No duplicates found - all images are unique")
+        
+        # Initialize zoom controls
+        self.update_zoom_controls()
 
     def on_tree_select(self, event):
         selected = self.tree.selection()
@@ -539,7 +582,7 @@ class DuplicateImageIdentifierApp:
                     img_path = child_item['values'][0]
                     try:
                         img = Image.open(img_path)
-                        img.thumbnail((150, 120), Image.Resampling.LANCZOS)
+                        img.thumbnail(self.multi_thumb_size, Image.Resampling.LANCZOS)
                         img_tk = ImageTk.PhotoImage(img)
                         group_images.append((img_tk, img_path))
                     except Exception as e:
@@ -621,7 +664,7 @@ class DuplicateImageIdentifierApp:
                     img_path = child_item['values'][0]
                     try:
                         img = Image.open(img_path)
-                        img.thumbnail((180, 135), Image.Resampling.LANCZOS)
+                        img.thumbnail(self.thumb_size, Image.Resampling.LANCZOS)
                         img_tk = ImageTk.PhotoImage(img)
                         images.append((img_tk, img_path))
                     except Exception as e:
@@ -703,6 +746,59 @@ class DuplicateImageIdentifierApp:
                 self.status_var.set(f"Viewing: {os.path.basename(path)}")
             except Exception as e:
                 self.lbl_result.config(text=f"Error loading image: {e}", fg=self.colors['danger'])
+    
+    def zoom_in(self):
+        """Increase thumbnail size for better image viewing"""
+        current_width, current_height = self.thumb_size
+        new_width = min(int(current_width * 1.1), self.max_thumb_size[0])
+        new_height = min(int(current_height * 1.1), self.max_thumb_size[1])
+        if (new_width, new_height) != self.thumb_size:
+            self.thumb_size = (new_width, new_height)
+            # Also scale the multi-group thumbnail size proportionally
+            self.multi_thumb_size = (int(new_width * 0.83), int(new_height * 0.89))
+            self.refresh_current_view()
+            self.update_zoom_controls()
+            
+    def zoom_out(self):
+        """Decrease thumbnail size for more images in view"""
+        current_width, current_height = self.thumb_size
+        new_width = max(int(current_width * 0.9), self.min_thumb_size[0])
+        new_height = max(int(current_height * 0.9), self.min_thumb_size[1])
+        if (new_width, new_height) != self.thumb_size:
+            self.thumb_size = (new_width, new_height)
+            # Also scale the multi-group thumbnail size proportionally
+            self.multi_thumb_size = (int(new_width * 0.83), int(new_height * 0.89))
+            self.refresh_current_view()
+            self.update_zoom_controls()
+            
+    def update_zoom_controls(self):
+        """Update zoom button states and percentage label"""
+        can_zoom_in = self.thumb_size[0] < self.max_thumb_size[0]
+        can_zoom_out = self.thumb_size[0] > self.min_thumb_size[0]
+        self.zoom_in_btn.config(state=tk.NORMAL if can_zoom_in else tk.DISABLED)
+        self.zoom_out_btn.config(state=tk.NORMAL if can_zoom_out else tk.DISABLED)
+        
+        # Calculate and display zoom percentage
+        base_width = 180  # Reference width (default thumb_size)
+        zoom_level = int((self.thumb_size[0] / base_width) * 100)
+        self.zoom_label.config(text=f"{zoom_level}%")
+    
+    def refresh_current_view(self):
+        """Refresh the current image view after zoom change"""
+        selected = self.tree.selection()
+        if selected:
+            # Clear current display
+            for widget in self.img_panel.winfo_children():
+                widget.destroy()
+            
+            # Redisplay with new thumbnail sizes
+            if len(selected) > 1:
+                self.display_multiple_groups(selected)
+            else:
+                self.display_single_selection(selected[0])
+                
+            # Update scroll region
+            self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
 
 if __name__ == "__main__":
     root = tk.Tk()
