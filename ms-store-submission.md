@@ -137,6 +137,9 @@ Before submitting, ensure you have:
 2. Sign in with your developer account
 3. Create a new app submission
 4. **App Identity**: Reserve app name "PhotoSift"
+   - The system will generate a Package Identity Name (e.g., `PCAI.PhotoSift`)
+   - You'll get a Publisher ID (e.g., `CN=3DE80B9A-18CE-447E-8E83-D1237B056E60`)
+   - These values must match exactly in your AppxManifest.xml
 5. **Packages**: Upload PhotoSift.msix
 6. **Store Listings**: Fill in required information:
    - **App name**: PhotoSift
@@ -219,8 +222,12 @@ Your final MSIX package will contain:
 
 5. **Store Submission Validation Errors (Fixed)**
    - **Missing Assets**: All required assets (StoreLogo.png, Square44x44Logo.png, Square150x150Logo.png) are now generated automatically
-   - **Publisher Name Mismatch**: Fixed Publisher and PublisherDisplayName to match "PC@AI"
+   - **Publisher Name Mismatch**: Fixed Publisher and PublisherDisplayName to match store account
    - **Missing Language Support**: Added Resources section with en-US language support
+   - **Package Identity Errors**: Fixed to match Microsoft Store requirements:
+     - Package Name: `PCAI.PhotoSift` (matches reserved app name)
+     - Publisher: `CN=3DE80B9A-18CE-447E-8E83-D1237B056E60` (matches developer certificate)
+     - Package Family Name: Now generates correctly as `PCAI.PhotoSift_gjxrrw65z5690`
    - **runFullTrust Capability**: This restricted capability is required for desktop apps and will be approved during store review
 
 4. **Store Submission Rejected**

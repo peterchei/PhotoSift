@@ -5,3 +5,6 @@ Output/**
 dist/** 
 models/**
 store_package/** 
+PhotoSift.msix
+photosift.pfx
+devcert.pfx
