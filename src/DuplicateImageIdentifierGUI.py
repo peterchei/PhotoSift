@@ -53,54 +53,41 @@ class DuplicateImageIdentifierApp:
         header.pack(fill=tk.X, padx=20, pady=(20, 0))
         header.pack_propagate(False)
         
-        # App title with modern styling
+        # App title section (left side)
         title_frame = tk.Frame(header, bg=self.colors['bg_primary'])
         title_frame.pack(side=tk.LEFT, fill=tk.Y)
         
-        tk.Label(title_frame, 
-                 text="PhotoSift", 
-                 font=("Segoe UI", 24, "bold"),
-                 bg=self.colors['bg_primary'], 
-                 fg=self.colors['text_primary']).pack(anchor="w")
+        title_label = tk.Label(title_frame, 
+                              text="PhotoSift", 
+                              font=("Segoe UI", 28, "bold"),
+                              bg=self.colors['bg_primary'], 
+                              fg=self.colors['text_primary'])
+        title_label.pack(anchor="w")
         
-        tk.Label(title_frame, 
-                 text="Duplicate Image Identifier", 
-                 font=("Segoe UI", 12),
-                 bg=self.colors['bg_primary'], 
-                 fg=self.colors['text_secondary']).pack(anchor="w")
+        subtitle_label = tk.Label(title_frame, 
+                                 text="Duplicate Image Identifier", 
+                                 font=("Segoe UI", 14),
+                                 bg=self.colors['bg_primary'], 
+                                 fg=self.colors['text_secondary'])
+        subtitle_label.pack(anchor="w")
         
-        # Zoom controls on the right side
-        zoom_frame = tk.Frame(header, bg=self.colors['bg_primary'])
-        zoom_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        # Header buttons frame (right side)
+        header_buttons = tk.Frame(header, bg=self.colors['bg_primary'])
+        header_buttons.pack(side=tk.RIGHT, fill=tk.Y)
         
-        self.zoom_out_btn = tk.Button(zoom_frame, 
-                                     text="🔍-", 
-                                     command=self.zoom_out,
-                                     font=("Segoe UI", 14),
-                                     bg=self.colors['bg_secondary'],
-                                     fg=self.colors['text_primary'],
-                                     activebackground=self.colors['bg_card'],
-                                     bd=0, relief=tk.FLAT, cursor="hand2",
-                                     padx=12, pady=8)
-        self.zoom_out_btn.pack(side=tk.LEFT, padx=(0, 5))
-        
-        self.zoom_in_btn = tk.Button(zoom_frame, 
-                                    text="🔍+", 
-                                    command=self.zoom_in,
-                                    font=("Segoe UI", 14),
-                                    bg=self.colors['bg_secondary'],
-                                    fg=self.colors['text_primary'],
-                                    activebackground=self.colors['bg_card'],
-                                    bd=0, relief=tk.FLAT, cursor="hand2",
-                                    padx=12, pady=8)
-        self.zoom_in_btn.pack(side=tk.LEFT, padx=(0, 10))
-        
-        self.zoom_label = tk.Label(zoom_frame, 
-                                  text="100%", 
-                                  font=("Segoe UI", 12), 
-                                  bg=self.colors['bg_primary'], 
-                                  fg=self.colors['text_secondary'])
-        self.zoom_label.pack(side=tk.LEFT, fill=tk.Y)
+        # Modern trash button with icon
+        self.trash_btn_var = tk.StringVar(value="🗑️ 0")
+        self.trash_btn = tk.Button(header_buttons, 
+                                  textvariable=self.trash_btn_var, 
+                                  command=self.open_trash_folder,
+                                  font=("Segoe UI", 12, "bold"),
+                                  bg=self.colors['bg_secondary'],
+                                  fg=self.colors['text_primary'],
+                                  activebackground=self.colors['bg_card'],
+                                  activeforeground=self.colors['text_primary'],
+                                  bd=0, relief=tk.FLAT, cursor="hand2",
+                                  padx=15, pady=8)
+        self.trash_btn.pack(side=tk.RIGHT, padx=(10, 0))
 
     def create_modern_content(self):
         # Main content container
@@ -112,7 +99,7 @@ class DuplicateImageIdentifierApp:
         
         # Create main area
         self.create_modern_main_area(content)
-
+    
     def create_modern_sidebar(self, parent):
         # Modern sidebar
         sidebar = tk.Frame(parent, bg=self.colors['bg_secondary'], width=280)
@@ -189,6 +176,74 @@ class DuplicateImageIdentifierApp:
         # Main area for image display
         main_area = tk.Frame(parent, bg=self.colors['bg_primary'])
         main_area.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, pady=(20, 0))
+        
+        # Navigation bar with zoom controls and action buttons
+        nav_bar = tk.Frame(main_area, bg=self.colors['bg_primary'], height=60)
+        nav_bar.pack(fill=tk.X, pady=(0, 20))
+        nav_bar.pack_propagate(False)
+        
+        # Zoom controls (left side)
+        zoom_frame = tk.Frame(nav_bar, bg=self.colors['bg_primary'])
+        zoom_frame.pack(side=tk.LEFT, fill=tk.Y)
+        
+        self.zoom_out_btn = tk.Button(zoom_frame, 
+                                     text="🔍-", 
+                                     command=self.zoom_out,
+                                     font=("Segoe UI", 14),
+                                     bg=self.colors['bg_secondary'],
+                                     fg=self.colors['text_primary'],
+                                     activebackground=self.colors['bg_card'],
+                                     bd=0, relief=tk.FLAT, cursor="hand2",
+                                     padx=12, pady=8)
+        self.zoom_out_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.zoom_in_btn = tk.Button(zoom_frame, 
+                                    text="🔍+", 
+                                    command=self.zoom_in,
+                                    font=("Segoe UI", 14),
+                                    bg=self.colors['bg_secondary'],
+                                    fg=self.colors['text_primary'],
+                                    activebackground=self.colors['bg_card'],
+                                    bd=0, relief=tk.FLAT, cursor="hand2",
+                                    padx=12, pady=8)
+        self.zoom_in_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        self.zoom_label = tk.Label(zoom_frame, 
+                                  text="100%", 
+                                  font=("Segoe UI", 12), 
+                                  bg=self.colors['bg_primary'], 
+                                  fg=self.colors['text_secondary'])
+        self.zoom_label.pack(side=tk.LEFT, fill=tk.Y)
+        
+        # Action buttons (right side of nav bar)
+        action_frame = tk.Frame(nav_bar, bg=self.colors['bg_primary'])
+        action_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Modern Select All button
+        self.select_all_btn = tk.Button(action_frame, 
+                                       text="Select All", 
+                                       command=self.select_all_groups,
+                                       font=("Segoe UI", 12, "bold"),
+                                       bg=self.colors['accent'],
+                                       fg=self.colors['text_primary'],
+                                       activebackground='#2563eb',
+                                       bd=0, relief=tk.FLAT, cursor="hand2",
+                                       padx=16, pady=8)
+        self.select_all_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Modern Clean button
+        self.clean_btn_var = tk.StringVar()
+        self.clean_btn_var.set("Clean (0)")
+        self.clean_btn = tk.Button(action_frame, 
+                                  textvariable=self.clean_btn_var,
+                                  command=self.clean_selected_images,
+                                  font=("Segoe UI", 12, "bold"),
+                                  bg=self.colors['danger'],
+                                  fg=self.colors['text_primary'],
+                                  activebackground='#dc2626',
+                                  bd=0, relief=tk.FLAT, cursor="hand2",
+                                  padx=16, pady=8)
+        self.clean_btn.pack(side=tk.LEFT)
         
         # Image display area with scrolling
         self.create_image_display_area(main_area)
@@ -528,6 +583,8 @@ class DuplicateImageIdentifierApp:
     def on_tree_select(self, event):
         selected = self.tree.selection()
         if not selected:
+            # Update clean button count for empty selection
+            self.update_clean_button_count()
             return
         
         # Clear previous images
@@ -539,6 +596,9 @@ class DuplicateImageIdentifierApp:
             self.display_multiple_groups(selected)
         else:
             self.display_single_selection(selected[0])
+        
+        # Update clean button count
+        self.update_clean_button_count()
         
         # Update scroll region
         self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
@@ -799,6 +859,133 @@ class DuplicateImageIdentifierApp:
                 
             # Update scroll region
             self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
+    
+    def select_all_groups(self):
+        """Select all duplicate groups in the tree view"""
+        if not self.tree:
+            return
+            
+        # Clear current selection
+        self.tree.selection_remove(self.tree.selection())
+        
+        # Select all items in the tree
+        all_items = self.tree.get_children()
+        for item in all_items:
+            self.tree.selection_add(item)
+            
+        # Update clean button count
+        self.update_clean_button_count()
+    
+    def clean_selected_images(self):
+        """Move selected duplicate images to trash"""
+        selected_items = self.tree.selection() if self.tree else []
+        if not selected_items:
+            messagebox.showinfo("No Selection", "Please select duplicate groups to clean.")
+            return
+        
+        # Count images to be cleaned from selected groups
+        images_to_clean = []
+        groups_processed = 0
+        
+        for item in selected_items:
+            # Get children (individual images) of selected group
+            children = self.tree.get_children(item)
+            if len(children) > 1:  # Only clean if there are duplicates
+                groups_processed += 1
+                # Keep the first image, clean the rest
+                for i, child in enumerate(children[1:], 1):
+                    child_item = self.tree.item(child)
+                    if 'values' in child_item and child_item['values']:
+                        img_path = child_item['values'][0]
+                        if img_path and os.path.exists(img_path):
+                            images_to_clean.append(img_path)
+        
+        if not images_to_clean:
+            messagebox.showinfo("Nothing to Clean", "No duplicate images found in selection.")
+            return
+        
+        # Confirm cleaning action
+        result = messagebox.askyesno(
+            "Confirm Clean", 
+            f"Move {len(images_to_clean)} duplicate images from {groups_processed} groups to trash?\n\nThis action cannot be undone.",
+            icon='warning'
+        )
+        
+        if result:
+            self.move_images_to_trash(images_to_clean)
+            # Refresh the display
+            self.find_duplicates()
+    
+    def move_images_to_trash(self, image_paths):
+        """Move images to system trash"""
+        try:
+            import send2trash
+            moved_count = 0
+            
+            for img_path in image_paths:
+                try:
+                    if os.path.exists(img_path):
+                        send2trash.send2trash(img_path)
+                        moved_count += 1
+                except Exception as e:
+                    print(f"Error moving {img_path} to trash: {e}")
+            
+            messagebox.showinfo("Clean Complete", f"Successfully moved {moved_count} images to trash.")
+            
+        except ImportError:
+            # Fallback - create a PhotoSift trash folder
+            self.create_photosift_trash(image_paths)
+    
+    def create_photosift_trash(self, image_paths):
+        """Create PhotoSift trash folder and move images there"""
+        try:
+            # Create trash folder in PhotoSift directory
+            trash_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "PhotoSift_Trash")
+            os.makedirs(trash_dir, exist_ok=True)
+            
+            moved_count = 0
+            for img_path in image_paths:
+                try:
+                    if os.path.exists(img_path):
+                        filename = os.path.basename(img_path)
+                        trash_path = os.path.join(trash_dir, filename)
+                        
+                        # Handle duplicate names in trash
+                        counter = 1
+                        base_name, ext = os.path.splitext(filename)
+                        while os.path.exists(trash_path):
+                            new_name = f"{base_name}_{counter}{ext}"
+                            trash_path = os.path.join(trash_dir, new_name)
+                            counter += 1
+                        
+                        import shutil
+                        shutil.move(img_path, trash_path)
+                        moved_count += 1
+                except Exception as e:
+                    print(f"Error moving {img_path} to PhotoSift trash: {e}")
+            
+            messagebox.showinfo("Clean Complete", 
+                              f"Successfully moved {moved_count} images to PhotoSift_Trash folder.\n"
+                              f"Location: {trash_dir}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to create trash folder: {e}")
+    
+    def open_trash_folder(self):
+        """Open the PhotoSift trash folder"""
+        trash_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "PhotoSift_Trash")
+        
+        if os.path.exists(trash_dir):
+            # Open folder in Windows Explorer
+            os.startfile(trash_dir)
+        else:
+            messagebox.showinfo("Trash Empty", "No PhotoSift trash folder found. No items have been cleaned yet.")
+    
+    def update_clean_button_count(self):
+        """Update the clean button with the count of selected items"""
+        if hasattr(self, 'clean_btn_var') and self.tree:
+            selected_count = len(self.tree.selection())
+            self.clean_btn_var.set(f"Clean ({selected_count})")
 
 if __name__ == "__main__":
     root = tk.Tk()
