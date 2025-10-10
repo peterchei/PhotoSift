@@ -28,6 +28,7 @@ class DuplicateImageIdentifierApp:
         self.groups = []
         self.setup_ui()
         self.apply_modern_styling()
+        self.create_status_bar()
 
     def setup_ui(self):
         # Configure main window
@@ -81,12 +82,6 @@ class DuplicateImageIdentifierApp:
         # Folder selection section
         folder_section = tk.Frame(sidebar, bg=self.colors['bg_secondary'])
         folder_section.pack(fill=tk.X, padx=20, pady=(20, 10))
-        
-        tk.Label(folder_section, 
-                text="📁 Select Folder", 
-                font=("Segoe UI", 14, "bold"),
-                bg=self.colors['bg_secondary'], 
-                fg=self.colors['text_primary']).pack(anchor="w", pady=(0, 10))
         
         # Modern select folder button
         self.select_btn = tk.Button(folder_section, 
@@ -309,6 +304,22 @@ class DuplicateImageIdentifierApp:
                        darkcolor=self.colors['bg_secondary'],
                        lightcolor=self.colors['bg_secondary'])
 
+    def create_status_bar(self):
+        # Modern status bar at bottom
+        status_frame = tk.Frame(self.root, bg=self.colors['bg_secondary'], height=35)
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        status_frame.pack_propagate(False)
+        
+        self.status_var = tk.StringVar()
+        self.status_var.set("Ready - Select a folder to find duplicates")
+        self.status_bar = tk.Label(status_frame, 
+                                  textvariable=self.status_var, 
+                                  bd=0, relief=tk.FLAT, anchor=tk.W, 
+                                  bg=self.colors['bg_secondary'], 
+                                  fg=self.colors['text_secondary'], 
+                                  font=("Segoe UI", 11))
+        self.status_bar.pack(fill=tk.BOTH, expand=True, padx=20)
+
     def select_folder(self):
         folder = filedialog.askdirectory()
         if folder:
@@ -328,6 +339,7 @@ class DuplicateImageIdentifierApp:
             total = len(files)
             
             if total == 0:
+                self.status_var.set("No images found in selected folder")
                 messagebox.showinfo("No Images", "No images found in the selected folder.")
                 return
             
@@ -354,10 +366,14 @@ class DuplicateImageIdentifierApp:
                         
                         print(f"[LOG] Processing images {start+1}-{end}/{total} ({percent}%)")
                         
-                        # Update progress window
+                        # Update progress window and status bar
                         status_text = f"Processing Images ({percent}%)"
                         detail_text = f"Analyzing batch {start+1}-{end} of {total} images..."
                         self.update_progress(end, total, status_text, detail_text)
+                        
+                        # Update status bar
+                        status_bar_text = f"Processing images {start+1}-{end}/{total} ({percent}%)"
+                        self.root.after(0, self.status_var.set, status_bar_text)
                         
                         try:
                             batch_embeddings = get_clip_embedding_batch(batch_files)
@@ -370,6 +386,7 @@ class DuplicateImageIdentifierApp:
                     # Update progress for duplicate detection phase
                     self.update_progress(total, total, "Identifying Duplicates...", 
                                        "Comparing image similarities and grouping duplicates...")
+                    self.root.after(0, self.status_var.set, "Identifying duplicate groups...")
                     
                     self.groups = group_similar_images_clip(folder=folder, embeddings=embeddings, files=files)
                     
@@ -377,6 +394,11 @@ class DuplicateImageIdentifierApp:
                     final_status = f"Complete! Found {len(self.groups)} duplicate groups"
                     final_detail = f"Processed {total} images successfully"
                     self.update_progress(total, total, final_status, final_detail)
+                    
+                    # Update status bar with final result
+                    final_status_text = f"Done! Found {len(self.groups)} duplicate groups from {total} images (100%)"
+                    self.root.after(0, self.status_var.set, final_status_text)
+                    self.root.after(0, self.status_bar.config, {"bg": "#33cc33", "fg": "white"})
                     
                     # Update main UI
                     self.lbl_result.config(text=f"Found {len(self.groups)} duplicate groups", 
@@ -395,6 +417,10 @@ class DuplicateImageIdentifierApp:
                     self.lbl_result.config(text="Processing failed. Check console for details.", 
                                          fg=self.colors['danger'])
                     
+                    # Update status bar with error
+                    self.root.after(0, self.status_var.set, f"Processing failed: {str(e)}")
+                    self.root.after(0, self.status_bar.config, {"bg": "#cc3333", "fg": "white"})
+                    
                     # Close progress window after error
                     self.root.after(3000, self.close_progress)
                 
@@ -404,6 +430,9 @@ class DuplicateImageIdentifierApp:
         import time
         t0 = time.perf_counter()
         print(f"[LOG] Starting tree population: {len(self.groups)} groups")
+        
+        # Update status bar for tree population
+        self.status_var.set(f"Building tree view for {len(self.groups)} duplicate groups...")
         
         self.tree.delete(*self.tree.get_children())
         
@@ -429,6 +458,13 @@ class DuplicateImageIdentifierApp:
                     self.tree.insert(group_node, "end", text=f"🖼️ {filename}", values=(img_path,))
         
         print(f"[LOG] Finished tree population in {time.perf_counter()-t0:.2f}s")
+        
+        # Update status bar when tree population is complete
+        if len(self.groups) > 0:
+            total_images = sum(len(group) for group in self.groups)
+            self.status_var.set(f"Ready - {len(self.groups)} duplicate groups with {total_images} images")
+        else:
+            self.status_var.set("No duplicates found - all images are unique")
 
     def on_tree_select(self, event):
         selected = self.tree.selection()
@@ -521,6 +557,9 @@ class DuplicateImageIdentifierApp:
                 self.lbl_result.config(text=f"Group: {item['text']} - {len(images)} images", 
                                      fg=self.colors['text_primary'])
                 
+                # Update status bar when viewing a group
+                self.status_var.set(f"Viewing duplicate group with {len(images)} similar images")
+                
         # If leaf node, show single image enlarged
         elif 'values' in item and item['values']:
             path = item['values'][0]
@@ -538,6 +577,9 @@ class DuplicateImageIdentifierApp:
                 lbl.pack(expand=True)
                 
                 self.lbl_result.config(text=os.path.basename(path), fg=self.colors['text_primary'])
+                
+                # Update status bar when viewing a single image
+                self.status_var.set(f"Viewing: {os.path.basename(path)}")
             except Exception as e:
                 self.lbl_result.config(text=f"Error loading image: {e}", fg=self.colors['danger'])
         
