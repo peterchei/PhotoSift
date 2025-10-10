@@ -27,6 +27,11 @@ class DuplicateImageIdentifierApp:
         self.folder = None
         self.groups = []
         
+        # Selection and confidence tracking
+        self.selected_check_vars = []  # List of (checkbox_var, image_path) tuples
+        self.similarity_scores = {}  # path -> similarity score for duplicates
+        self._updating_bulk_selection = False  # Flag to prevent callback loops during bulk operations
+        
         # Thumbnail size configuration for zoom functionality
         self.thumb_size = (180, 135)  # Default size for single group view
         self.multi_thumb_size = (150, 120)  # Default size for multi-group view
@@ -491,8 +496,16 @@ class DuplicateImageIdentifierApp:
                         status_bar_text = f"Identifying duplicates: {current}/{total_imgs} ({percent}%)"
                         self.root.after(0, self.status_var.set, status_bar_text)
                     
-                    self.groups = group_similar_images_clip(folder=folder, embeddings=embeddings, files=files, 
-                                                          progress_callback=duplicate_progress_callback)
+                    # Get groups and similarity scores
+                    result = group_similar_images_clip(folder=folder, embeddings=embeddings, files=files, 
+                                                     progress_callback=duplicate_progress_callback, 
+                                                     return_scores=True)
+                    if isinstance(result, tuple):
+                        self.groups, self.similarity_scores = result
+                    else:
+                        # Fallback for older version
+                        self.groups = result
+                        self.similarity_scores = {}
                     
                     # Update final status
                     total_duplicates = sum(len(group) - 1 for group in self.groups)
@@ -587,9 +600,10 @@ class DuplicateImageIdentifierApp:
             self.update_clean_button_count()
             return
         
-        # Clear previous images
+        # Clear previous images and selection tracking
         for widget in self.img_panel.winfo_children():
             widget.destroy()
+        self.selected_check_vars.clear()  # Clear checkbox tracking
         
         # Handle multiple selection
         if len(selected) > 1:
@@ -673,18 +687,56 @@ class DuplicateImageIdentifierApp:
                     lbl_img.image = img_tk
                     lbl_img.pack()
                     
-                    # Filename label
-                    filename = os.path.basename(img_path)
-                    if len(filename) > 15:
-                        filename = filename[:12] + "..."
+                    # Info section for checkbox and similarity score
+                    info_frame = tk.Frame(img_container, bg=self.colors['bg_card'])
+                    info_frame.pack(fill=tk.X, pady=(3, 0))
                     
-                    lbl_name = tk.Label(img_container, 
-                                       text=filename, 
-                                       font=("Segoe UI", 9),
+                    # Checkbox and filename
+                    var = tk.BooleanVar()
+                    filename = os.path.basename(img_path)
+                    if len(filename) > 12:
+                        display_filename = filename[:9] + "..."
+                    else:
+                        display_filename = filename
+                    
+                    chk = tk.Checkbutton(info_frame,
+                                       text=display_filename,
+                                       variable=var,
+                                       command=lambda v=var, p=img_path: self.on_image_check(v, p),
+                                       font=("Segoe UI", 8, "bold"),
                                        bg=self.colors['bg_card'],
                                        fg=self.colors['text_primary'],
-                                       wraplength=150)
-                    lbl_name.pack(pady=(3, 0))
+                                       activebackground=self.colors['bg_card'],
+                                       selectcolor=self.colors['accent'],
+                                       bd=0, highlightthickness=0,
+                                       anchor="w")
+                    chk.pack(fill=tk.X, pady=(0, 1))
+                    
+                    # Similarity score with color coding
+                    if img_path in self.similarity_scores:
+                        similarity = self.similarity_scores[img_path]
+                        sim_text = f"{similarity:.0%}"  # Shorter format for multi-view
+                        
+                        # Color code based on similarity
+                        if similarity >= 0.98:
+                            sim_color = self.colors['success']
+                        elif similarity >= 0.96:
+                            sim_color = self.colors['accent']
+                        elif similarity >= 0.95:
+                            sim_color = self.colors['warning']
+                        else:
+                            sim_color = self.colors['danger']
+                        
+                        sim_label = tk.Label(info_frame,
+                                           text=sim_text,
+                                           font=("Segoe UI", 7),
+                                           bg=self.colors['bg_card'],
+                                           fg=sim_color,
+                                           anchor="w")
+                        sim_label.pack(fill=tk.X)
+                    
+                    # Store checkbox reference
+                    self.selected_check_vars.append((var, img_path))
                     
                     # Hover effects
                     def on_enter(e, card=card):
@@ -693,7 +745,7 @@ class DuplicateImageIdentifierApp:
                     def on_leave(e, card=card):
                         card.configure(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
                     
-                    for widget in [card, lbl_img, lbl_name]:
+                    for widget in [card, lbl_img, chk]:
                         widget.bind("<Enter>", on_enter)
                         widget.bind("<Leave>", on_leave)
                 
@@ -758,18 +810,56 @@ class DuplicateImageIdentifierApp:
                     lbl_img.image = img_tk
                     lbl_img.pack()
                     
-                    # Filename label
-                    filename = os.path.basename(img_path)
-                    if len(filename) > 20:
-                        filename = filename[:17] + "..."
+                    # Info section for checkbox and similarity score
+                    info_frame = tk.Frame(img_container, bg=self.colors['bg_card'])
+                    info_frame.pack(fill=tk.X, pady=(5, 0))
                     
-                    lbl_name = tk.Label(img_container, 
-                                       text=filename, 
-                                       font=("Segoe UI", 10),
+                    # Checkbox and filename
+                    var = tk.BooleanVar()
+                    filename = os.path.basename(img_path)
+                    if len(filename) > 18:
+                        display_filename = filename[:15] + "..."
+                    else:
+                        display_filename = filename
+                    
+                    chk = tk.Checkbutton(info_frame,
+                                       text=display_filename,
+                                       variable=var,
+                                       command=lambda v=var, p=img_path: self.on_image_check(v, p),
+                                       font=("Segoe UI", 9, "bold"),
                                        bg=self.colors['bg_card'],
                                        fg=self.colors['text_primary'],
-                                       wraplength=180)
-                    lbl_name.pack(pady=(5, 0))
+                                       activebackground=self.colors['bg_card'],
+                                       selectcolor=self.colors['accent'],
+                                       bd=0, highlightthickness=0,
+                                       anchor="w")
+                    chk.pack(fill=tk.X, pady=(0, 2))
+                    
+                    # Similarity score with color coding
+                    if img_path in self.similarity_scores:
+                        similarity = self.similarity_scores[img_path]
+                        sim_text = f"Similarity: {similarity:.0%}"
+                        
+                        # Color code based on similarity
+                        if similarity >= 0.98:
+                            sim_color = self.colors['success']  # High similarity - green
+                        elif similarity >= 0.96:
+                            sim_color = self.colors['accent']   # Medium-high - blue
+                        elif similarity >= 0.95:
+                            sim_color = self.colors['warning']  # Medium - orange
+                        else:
+                            sim_color = self.colors['danger']   # Lower - red
+                        
+                        sim_label = tk.Label(info_frame,
+                                           text=sim_text,
+                                           font=("Segoe UI", 8),
+                                           bg=self.colors['bg_card'],
+                                           fg=sim_color,
+                                           anchor="w")
+                        sim_label.pack(fill=tk.X)
+                    
+                    # Store checkbox reference for later use
+                    self.selected_check_vars.append((var, img_path))
                     
                     # Hover effects
                     def on_enter(e, card=card):
@@ -778,7 +868,7 @@ class DuplicateImageIdentifierApp:
                     def on_leave(e, card=card):
                         card.configure(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
                     
-                    for widget in [card, lbl_img, lbl_name]:
+                    for widget in [card, lbl_img, chk]:
                         widget.bind("<Enter>", on_enter)
                         widget.bind("<Leave>", on_leave)
                 
@@ -861,60 +951,90 @@ class DuplicateImageIdentifierApp:
             self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
     
     def select_all_groups(self):
-        """Select all duplicate groups in the tree view"""
-        if not self.tree:
-            return
+        """Select all images via checkboxes, or all groups if no images displayed"""
+        # If there are image checkboxes visible, toggle them
+        if self.selected_check_vars:
+            self.toggle_select_all_images()
+        else:
+            # Otherwise, select all tree items
+            if not self.tree:
+                return
+                
+            # Clear current selection
+            self.tree.selection_remove(self.tree.selection())
             
-        # Clear current selection
-        self.tree.selection_remove(self.tree.selection())
-        
-        # Select all items in the tree
-        all_items = self.tree.get_children()
-        for item in all_items:
-            self.tree.selection_add(item)
-            
-        # Update clean button count
-        self.update_clean_button_count()
+            # Select all items in the tree
+            all_items = self.tree.get_children()
+            for item in all_items:
+                self.tree.selection_add(item)
+                
+            # Update clean button count
+            self.update_clean_button_count()
     
     def clean_selected_images(self):
         """Move selected duplicate images to trash"""
-        selected_items = self.tree.selection() if self.tree else []
-        if not selected_items:
-            messagebox.showinfo("No Selection", "Please select duplicate groups to clean.")
-            return
-        
-        # Count images to be cleaned from selected groups
-        images_to_clean = []
-        groups_processed = 0
-        
-        for item in selected_items:
-            # Get children (individual images) of selected group
-            children = self.tree.get_children(item)
-            if len(children) > 1:  # Only clean if there are duplicates
-                groups_processed += 1
-                # Keep the first image, clean the rest
-                for i, child in enumerate(children[1:], 1):
-                    child_item = self.tree.item(child)
-                    if 'values' in child_item and child_item['values']:
-                        img_path = child_item['values'][0]
-                        if img_path and os.path.exists(img_path):
-                            images_to_clean.append(img_path)
-        
-        if not images_to_clean:
-            messagebox.showinfo("Nothing to Clean", "No duplicate images found in selection.")
-            return
-        
-        # Confirm cleaning action
-        result = messagebox.askyesno(
-            "Confirm Clean", 
-            f"Move {len(images_to_clean)} duplicate images from {groups_processed} groups to trash?\n\nThis action cannot be undone.",
-            icon='warning'
-        )
-        
-        if result:
-            self.move_images_to_trash(images_to_clean)
-            # Refresh the display
-            self.find_duplicates()
+        # Check if we have checkbox selections
+        if self.selected_check_vars:
+            # Use checkbox selections
+            images_to_clean = []
+            for var, img_path in self.selected_check_vars:
+                if var.get() and os.path.exists(img_path):
+                    images_to_clean.append(img_path)
+            
+            if not images_to_clean:
+                messagebox.showinfo("No Selection", "Please select images using checkboxes to clean.")
+                return
+            
+            # Confirm cleaning action
+            result = messagebox.askyesno(
+                "Confirm Clean", 
+                f"Move {len(images_to_clean)} selected images to trash?\n\nThis action cannot be undone.",
+                icon='warning'
+            )
+            
+            if result:
+                self.move_images_to_trash(images_to_clean)
+                # Refresh the display
+                self.refresh_after_clean()
+        else:
+            # Fallback to tree selection method
+            selected_items = self.tree.selection() if self.tree else []
+            if not selected_items:
+                messagebox.showinfo("No Selection", "Please select duplicate groups to clean.")
+                return
+            
+            # Count images to be cleaned from selected groups
+            images_to_clean = []
+            groups_processed = 0
+            
+            for item in selected_items:
+                # Get children (individual images) of selected group
+                children = self.tree.get_children(item)
+                if len(children) > 1:  # Only clean if there are duplicates
+                    groups_processed += 1
+                    # Keep the first image, clean the rest
+                    for i, child in enumerate(children[1:], 1):
+                        child_item = self.tree.item(child)
+                        if 'values' in child_item and child_item['values']:
+                            img_path = child_item['values'][0]
+                            if img_path and os.path.exists(img_path):
+                                images_to_clean.append(img_path)
+            
+            if not images_to_clean:
+                messagebox.showinfo("Nothing to Clean", "No duplicate images found in selection.")
+                return
+            
+            # Confirm cleaning action
+            result = messagebox.askyesno(
+                "Confirm Clean", 
+                f"Move {len(images_to_clean)} duplicate images from {groups_processed} groups to trash?\n\nThis action cannot be undone.",
+                icon='warning'
+            )
+            
+            if result:
+                self.move_images_to_trash(images_to_clean)
+                # Refresh the display
+                self.refresh_after_clean()
     
     def move_images_to_trash(self, image_paths):
         """Move images to system trash"""
@@ -983,9 +1103,65 @@ class DuplicateImageIdentifierApp:
     
     def update_clean_button_count(self):
         """Update the clean button with the count of selected items"""
-        if hasattr(self, 'clean_btn_var') and self.tree:
+        if not hasattr(self, 'clean_btn_var'):
+            return
+            
+        # Priority: Use checkbox selections if available, otherwise use tree selection
+        if self.selected_check_vars:
+            # Count selected checkboxes
+            selected_count = sum(1 for var, _ in self.selected_check_vars if var.get())
+        elif self.tree:
+            # Fall back to tree selection count
             selected_count = len(self.tree.selection())
+        else:
+            selected_count = 0
+            
+        self.clean_btn_var.set(f"Clean ({selected_count})")
+    
+    def on_image_check(self, var, img_path):
+        """Handle individual image checkbox selection"""
+        # Skip update if we're doing bulk selection to prevent performance issues
+        if getattr(self, '_updating_bulk_selection', False):
+            return
+            
+        # Update clean button count based on selected images
+        selected_count = sum(1 for v, _ in self.selected_check_vars if v.get())
+        if hasattr(self, 'clean_btn_var'):
             self.clean_btn_var.set(f"Clean ({selected_count})")
+    
+    def count_selected_images(self):
+        """Count how many images are currently selected via checkboxes"""
+        return sum(1 for var, _ in self.selected_check_vars if var.get())
+    
+    def toggle_select_all_images(self):
+        """Toggle selection of all visible images"""
+        if not self.selected_check_vars:
+            return
+            
+        # Check current state of first checkbox to determine action
+        first_var = self.selected_check_vars[0][0]
+        new_state = not first_var.get()
+        
+        # Temporarily disable callback updates to prevent performance issues
+        self._updating_bulk_selection = True
+        
+        try:
+            # Apply to all checkboxes
+            for var, _ in self.selected_check_vars:
+                var.set(new_state)
+        finally:
+            # Re-enable callback updates
+            self._updating_bulk_selection = False
+        
+        # Update clean button once at the end
+        selected_count = self.count_selected_images()
+        if hasattr(self, 'clean_btn_var'):
+            self.clean_btn_var.set(f"Clean ({selected_count})")
+    
+    def refresh_after_clean(self):
+        """Refresh the duplicate detection after cleaning images"""
+        messagebox.showinfo("Clean Complete", 
+                          "Images moved to trash. Please select the folder again to refresh duplicate detection.")
 
 if __name__ == "__main__":
     root = tk.Tk()

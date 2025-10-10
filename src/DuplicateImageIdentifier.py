@@ -47,7 +47,7 @@ def get_clip_embedding(img_path):
         image_features = model.get_image_features(**{k: v.to(device) for k, v in inputs.items()})
     return image_features.squeeze().cpu().numpy()
 
-def group_similar_images_clip(folder=None, threshold=0.95, embeddings=None, files=None, progress_callback=None):
+def group_similar_images_clip(folder=None, threshold=0.95, embeddings=None, files=None, progress_callback=None, return_scores=False):
     # Accept precomputed embeddings and file list for efficiency
     if files is None:
         files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(folder)
@@ -74,6 +74,7 @@ def group_similar_images_clip(folder=None, threshold=0.95, embeddings=None, file
     
     # Find duplicate groups using the precomputed similarity matrix
     groups = []
+    similarity_scores = {}  # Store similarity scores for each image
     used = set()
     total_files = len(file_list)
     
@@ -90,6 +91,14 @@ def group_similar_images_clip(folder=None, threshold=0.95, embeddings=None, file
         if len(group_indices) > 0:  # Only create group if there are duplicates
             group = [f1] + [file_list[idx] for idx in group_indices]
             groups.append(group)
+            
+            # Store similarity scores for this group (relative to the first image)
+            for idx in group_indices:
+                file_path = file_list[idx]
+                similarity_scores[file_path] = float(similarity_matrix[i][idx])
+            
+            # First image in group gets maximum score (1.0)
+            similarity_scores[f1] = 1.0
             
             # Mark all images in this group as used
             used.add(i)
@@ -108,7 +117,10 @@ def group_similar_images_clip(folder=None, threshold=0.95, embeddings=None, file
         progress_callback(total_files, total_files, "Duplicate Grouping Complete!", 
                         f"Found {len(groups)} duplicate groups from {total_files} images")
     
-    return groups
+    if return_scores:
+        return groups, similarity_scores
+    else:
+        return groups
 
 if __name__ == "__main__":
     folder = "test_image"  # change as needed
