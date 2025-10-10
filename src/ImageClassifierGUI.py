@@ -125,7 +125,8 @@ class ImageClassifierApp:
                 if cache_key in self.image_cache:
                     img_tk = self.image_cache[cache_key]
                 else:
-                    img = Image.open(img_path).resize(thumb_size)
+                    img = Image.open(img_path)
+                    img.thumbnail(thumb_size, Image.Resampling.LANCZOS)
                     img_tk = ImageTk.PhotoImage(img)
                     self.image_cache[cache_key] = img_tk
                 self.thumb_imgs.append(img_tk)
@@ -1139,7 +1140,8 @@ class ImageClassifierApp:
                 if cache_key in self.image_cache:
                     img_tk = self.image_cache[cache_key]
                 else:
-                    img = Image.open(img_path).resize(self.thumb_size)
+                    img = Image.open(img_path)
+                    img.thumbnail(self.thumb_size, Image.Resampling.LANCZOS)
                     img_tk = ImageTk.PhotoImage(img)
                     self.image_cache[cache_key] = img_tk
                 self.thumb_imgs.append(img_tk)
