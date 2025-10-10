@@ -425,17 +425,13 @@ class ImageClassifierApp:
         tree_wrapper = tk.Frame(tree_frame, bg=self.colors['bg_card'], bd=0, highlightthickness=0)
         tree_wrapper.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
         
-        # Modern scrollbars with dark styling
-        tree_scroll = tk.Scrollbar(tree_wrapper, 
-                                  orient=tk.VERTICAL,
-                                  bg=self.colors['bg_secondary'],
-                                  troughcolor=self.colors['bg_card'],
-                                  activebackground=self.colors['accent'])
-        tree_xscroll = tk.Scrollbar(tree_wrapper, 
-                                   orient=tk.HORIZONTAL,
-                                   bg=self.colors['bg_secondary'],
-                                   troughcolor=self.colors['bg_card'],
-                                   activebackground=self.colors['accent'])
+        # Modern TTK scrollbars matching image view style
+        tree_scroll = ttk.Scrollbar(tree_wrapper, 
+                                   orient=tk.VERTICAL,
+                                   style="Modern.Vertical.TScrollbar")
+        tree_xscroll = ttk.Scrollbar(tree_wrapper, 
+                                    orient=tk.HORIZONTAL,
+                                    style="Modern.Horizontal.TScrollbar")
         
         # Modern treeview with explicit styling
         self.tree = ttk.Treeview(tree_wrapper, 
@@ -502,6 +498,15 @@ class ImageClassifierApp:
         
         # Modern scrollbar styling
         tree_style.configure("Modern.Vertical.TScrollbar",
+                           background=self.colors['bg_secondary'],
+                           troughcolor=self.colors['bg_primary'],
+                           borderwidth=0,
+                           arrowcolor=self.colors['text_secondary'],
+                           darkcolor=self.colors['bg_secondary'],
+                           lightcolor=self.colors['bg_secondary'])
+        
+        # Horizontal scrollbar styling
+        tree_style.configure("Modern.Horizontal.TScrollbar",
                            background=self.colors['bg_secondary'],
                            troughcolor=self.colors['bg_primary'],
                            borderwidth=0,
