@@ -702,7 +702,7 @@ class ImageClassifierApp:
         self.thumbs_frame.bind("<Button-5>", lambda e: self.thumb_canvas.yview_scroll(1, "units"))
         
         self.content_frame.pack_forget()  # Hide initially
-        self.thumbs_frame = tk.Frame(self.thumb_canvas, bg="#f9fafb")
+        self.thumbs_frame = tk.Frame(self.thumb_canvas, bg=self.colors['bg_primary'])
         self.thumb_canvas.create_window((0,0), window=self.thumbs_frame, anchor="nw")
         # Configure frame for layout updates
         self.thumbs_frame.bind("<Configure>", lambda e: self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all")))
@@ -1147,52 +1147,78 @@ class ImageClassifierApp:
                 # Calculate layout position
                 cols = self.calculate_columns()
                 
-                # Create animated frame with shadow effect
-                frame = tk.Frame(self.thumbs_frame, bd=0, bg="#f9fafb", highlightbackground="#e0e6ef", highlightthickness=2)
+                # Create modern dark theme card
+                frame = tk.Frame(self.thumbs_frame, bd=0, 
+                               bg=self.colors['bg_card'], 
+                               highlightbackground=self.colors['bg_secondary'], 
+                               highlightthickness=1,
+                               relief=tk.SOLID)
                 frame.grid(row=idx//cols, column=idx%cols, padx=12, pady=12, sticky='nsew')
                 
-                # Add shadow frame behind for depth effect
-                shadow_frame = tk.Frame(frame, bg="#e0e6ef", width=self.thumb_size[0], height=self.thumb_size[1])
-                shadow_frame.place(x=4, y=4)  # Place shadow slightly offset
+                # Image container with padding
+                img_container = tk.Frame(frame, bg=self.colors['bg_card'])
+                img_container.pack(fill=tk.BOTH, expand=True, padx=8, pady=(8, 4))
                 
-                lbl_img = tk.Label(frame, image=img_tk, bg="#f9fafb")
+                lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
                 lbl_img.image = img_tk
                 lbl_img.pack()
                 lbl_img.bind('<Double-Button-1>', lambda e, p=img_path: self.open_full_image(p))
                 
-                # Enhanced hover animations
-                def on_enter(ev, f=frame, s=shadow_frame):
-                    # Instant color change with quick shadow animation
-                    f.config(bg="#e3eafc", highlightbackground="#a5d8fa")
-                    s.place(x=0, y=0)  # Quick lift effect
+                # Modern hover animations
+                def on_enter(ev, f=frame):
+                    f.config(highlightbackground=self.colors['accent'], highlightthickness=2)
                     
-                def on_leave(ev, f=frame, s=shadow_frame):
-                    # Instant color change with quick shadow reset
-                    f.config(bg="#f9fafb", highlightbackground="#e0e6ef")
-                    s.place(x=4, y=4)  # Quick drop effect
+                def on_leave(ev, f=frame):
+                    f.config(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
                 frame.bind("<Enter>", on_enter)
                 frame.bind("<Leave>", on_leave)
                 lbl_img.bind("<Enter>", on_enter)
                 lbl_img.bind("<Leave>", on_leave)
+                
                 var = tk.BooleanVar()
                 # Create frame for text (filename and confidence)
-                text_frame = tk.Frame(frame, bg="#f9fafb")
-                text_frame.pack(fill=tk.X, pady=4)
+                text_frame = tk.Frame(frame, bg=self.colors['bg_card'])
+                text_frame.pack(fill=tk.X, padx=8, pady=(0, 8))
                 
-                # Filename checkbox
-                chk = tk.Checkbutton(text_frame, text=os.path.basename(img_path), variable=var, 
+                # Filename checkbox with modern styling
+                filename = os.path.basename(img_path)
+                if len(filename) > 25:
+                    filename = filename[:22] + "..."
+                
+                chk = tk.Checkbutton(text_frame, 
+                                   text=filename, 
+                                   variable=var, 
                                    command=lambda v=var, p=img_path: self.on_image_check(v, p), 
-                                   font=("Arial", 10), bg="#f9fafb", activebackground="#e3eafc", 
-                                   selectcolor="#a5d8fa", bd=0, highlightthickness=0)
-                chk.pack(side=tk.LEFT)
+                                   font=("Segoe UI", 9, "bold"), 
+                                   bg=self.colors['bg_card'],
+                                   fg=self.colors['text_primary'],
+                                   activebackground=self.colors['bg_card'], 
+                                   selectcolor=self.colors['accent'], 
+                                   bd=0, highlightthickness=0)
+                chk.pack(anchor="w", pady=(0, 2))
                 
-                # Confidence score if available
+                # Confidence score with color coding
                 if img_path in self.confidence_scores:
                     conf_score = self.confidence_scores[img_path]
-                    conf_text = f"{conf_score:.2f}"
-                    conf_label = tk.Label(text_frame, text=conf_text, font=("Arial", 9), 
-                                        bg="#f9fafb", fg="#666666", cursor="question_arrow")
-                    conf_label.pack(side=tk.RIGHT, padx=4)
+                    conf_text = f"Confidence: {conf_score:.0%}"
+                    
+                    # Color code based on confidence
+                    if conf_score >= 0.9:
+                        conf_color = self.colors['success']
+                    elif conf_score >= 0.7:
+                        conf_color = self.colors['accent']
+                    elif conf_score >= 0.5:
+                        conf_color = self.colors['warning']
+                    else:
+                        conf_color = self.colors['danger']
+                    
+                    conf_label = tk.Label(text_frame, 
+                                        text=conf_text, 
+                                        font=("Segoe UI", 8), 
+                                        bg=self.colors['bg_card'], 
+                                        fg=conf_color,
+                                        cursor="question_arrow")
+                    conf_label.pack(anchor="w")
                     
                     # Create tooltip with confidence explanation
                     category = self.image_labels.get(img_path, "unknown")
@@ -1442,15 +1468,15 @@ class ImageClassifierApp:
     def on_image_check(self, var, path, frame=None):
         if frame:
             if var.get():
-                # Selected state - blue highlight and thicker border
-                frame.config(bg="#e3eafc", highlightbackground="#3399ff", highlightthickness=3)
-                if hasattr(frame, 'shadow_frame'):
-                    frame.shadow_frame.place(x=0, y=0)  # Lift effect when selected
+                # Selected state - blue accent highlight
+                frame.config(bg=self.colors['bg_card'], 
+                           highlightbackground=self.colors['accent'], 
+                           highlightthickness=3)
             else:
-                # Unselected state - default colors and border
-                frame.config(bg="#f9fafb", highlightbackground="#e0e6ef", highlightthickness=2)
-                if hasattr(frame, 'shadow_frame'):
-                    frame.shadow_frame.place(x=4, y=4)  # Normal shadow when unselected
+                # Unselected state - default dark theme colors
+                frame.config(bg=self.colors['bg_card'], 
+                           highlightbackground=self.colors['bg_secondary'], 
+                           highlightthickness=1)
         
         print(f"Selected: {os.path.basename(path)}")
         #messagebox.showinfo("Image Selected", f"Selected: {os.path.basename(path)}")
