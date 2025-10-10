@@ -13,6 +13,60 @@ from PIL import Image, ImageTk
 from ImageClassification import classify_people_vs_screenshot, IMG_EXT
 from ImageClassification import classify_people_vs_screenshot_batch
 
+class ToolTip:
+    """Create a tooltip for a given widget"""
+    def __init__(self, widget, text='widget info'):
+        self.widget = widget
+        self.text = text
+        self.tipwindow = None
+        self.id = None
+        self.x = self.y = 0
+        self.widget.bind('<Enter>', self.enter)
+        self.widget.bind('<Leave>', self.leave)
+        self.widget.bind('<Motion>', self.motion)
+
+    def enter(self, event=None):
+        self.schedule()
+
+    def leave(self, event=None):
+        self.unschedule()
+        self.hidetip()
+
+    def motion(self, event=None):
+        self.unschedule()
+        self.schedule()
+
+    def schedule(self):
+        self.unschedule()
+        self.id = self.widget.after(500, self.showtip)  # 500ms delay
+
+    def unschedule(self):
+        id_ = self.id
+        self.id = None
+        if id_:
+            self.widget.after_cancel(id_)
+
+    def showtip(self):
+        if self.tipwindow:
+            return
+        x = self.widget.winfo_rootx() + 25
+        y = self.widget.winfo_rooty() + 25
+        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        tw.configure(bg='#ffffe0', relief='solid', borderwidth=1)
+        label = tk.Label(tw, text=self.text, justify=tk.LEFT,
+                        background='#ffffe0', foreground='#000000',
+                        relief='flat', borderwidth=0,
+                        font=("Segoe UI", 10))
+        label.pack(ipadx=8, ipady=4)
+
+    def hidetip(self):
+        tw = self.tipwindow
+        self.tipwindow = None
+        if tw:
+            tw.destroy()
+
 class ImageClassifierApp:
     def select_all_photos(self):
         if not hasattr(self, 'selected_check_vars') or not self.selected_check_vars:
@@ -171,7 +225,7 @@ class ImageClassifierApp:
 
         # Top frame for folder selection and trash button
         frm = tk.Frame(self.root, bg="#f7fafc")
-        frm.pack(fill=tk.X, padx=24, pady=(14, 18))
+        frm.pack(fill=tk.X, padx=24, pady=(14, 8))
         
         # Right side container for trash button
         trash_container = tk.Frame(frm, bg="#f7fafc")
@@ -195,7 +249,7 @@ class ImageClassifierApp:
 
         # Main frame for tree and image
         main_frame = tk.Frame(self.root, bg="#f7fafc")
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=18, pady=10)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=18, pady=(5, 10))
 
         # Sidebar (Treeview) with rounded corners and soft shadow
         sidebar = tk.Frame(main_frame, bg="#e9ecf2", width=220, height=500, bd=0, highlightbackground="#dbeafe", highlightthickness=2)
@@ -813,10 +867,16 @@ class ImageClassifierApp:
                 
                 # Confidence score if available
                 if img_path in self.confidence_scores:
-                    conf_text = f"{self.confidence_scores[img_path]:.2f}"
+                    conf_score = self.confidence_scores[img_path]
+                    conf_text = f"{conf_score:.2f}"
                     conf_label = tk.Label(text_frame, text=conf_text, font=("Arial", 9), 
-                                        bg="#f9fafb", fg="#666666")
+                                        bg="#f9fafb", fg="#666666", cursor="question_arrow")
                     conf_label.pack(side=tk.RIGHT, padx=4)
+                    
+                    # Create tooltip with confidence explanation
+                    category = self.image_labels.get(img_path, "unknown")
+                    tooltip_text = self.get_confidence_tooltip(conf_score, category)
+                    ToolTip(conf_label, tooltip_text)
                 self.selected_check_vars.append((var, img_path))
                 var.trace_add('write', lambda *args: self.update_clean_btn_label(self.count_selected_photos()))
             except Exception:
@@ -836,6 +896,33 @@ class ImageClassifierApp:
         
         # Calculate number of columns that can fit
         return max(1, canvas_width // thumb_space)
+    
+    def get_confidence_tooltip(self, confidence, category):
+        """Generate helpful tooltip text for confidence scores"""
+        if confidence >= 0.9:
+            level = "Very High"
+            explanation = "The AI is very confident about this classification."
+        elif confidence >= 0.75:
+            level = "High"
+            explanation = "The AI is confident about this classification."
+        elif confidence >= 0.6:
+            level = "Moderate"
+            explanation = "The AI has moderate confidence. Consider reviewing this image."
+        elif confidence >= 0.4:
+            level = "Low"
+            explanation = "The AI has low confidence. This image may be misclassified."
+        else:
+            level = "Very Low"
+            explanation = "The AI has very low confidence. This image is likely misclassified."
+        
+        tooltip = f"Confidence: {confidence:.2f} ({level})\n"
+        tooltip += f"Category: {category.title()}\n"
+        tooltip += explanation
+        
+        if confidence < 0.6:
+            tooltip += "\n\nTip: Lower confidence scores may indicate the image doesn't clearly fit either category."
+        
+        return tooltip
     
     def count_selected_photos(self):
         return sum(var.get() for var, _ in self.selected_check_vars)
