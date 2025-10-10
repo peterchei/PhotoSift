@@ -1153,11 +1153,11 @@ class ImageClassifierApp:
                                highlightbackground=self.colors['bg_secondary'], 
                                highlightthickness=1,
                                relief=tk.SOLID)
-                frame.grid(row=idx//cols, column=idx%cols, padx=12, pady=12, sticky='nsew')
+                frame.grid(row=idx//cols, column=idx%cols, padx=6, pady=6, sticky='nsew')
                 
-                # Image container with padding
+                # Image container with reduced padding
                 img_container = tk.Frame(frame, bg=self.colors['bg_card'])
-                img_container.pack(fill=tk.BOTH, expand=True, padx=8, pady=(8, 4))
+                img_container.pack(fill=tk.BOTH, expand=True, padx=4, pady=(4, 2))
                 
                 lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
                 lbl_img.image = img_tk
@@ -1178,7 +1178,7 @@ class ImageClassifierApp:
                 var = tk.BooleanVar()
                 # Create frame for text (filename and confidence)
                 text_frame = tk.Frame(frame, bg=self.colors['bg_card'])
-                text_frame.pack(fill=tk.X, padx=8, pady=(0, 8))
+                text_frame.pack(fill=tk.X, padx=4, pady=(0, 4))
                 
                 # Filename checkbox with modern styling
                 filename = os.path.basename(img_path)
@@ -1239,7 +1239,7 @@ class ImageClassifierApp:
             canvas_width = self.thumb_canvas.master.winfo_width() or 800
         
         # Calculate space needed for each thumbnail including padding
-        thumb_space = self.thumb_size[0] + 24  # thumbnail width + padding
+        thumb_space = self.thumb_size[0] + 12  # thumbnail width + reduced padding
         
         # Calculate number of columns that can fit
         return max(1, canvas_width // thumb_space)
