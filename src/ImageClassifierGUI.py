@@ -130,48 +130,83 @@ class ImageClassifierApp:
                     self.image_cache[cache_key] = img_tk
                 self.thumb_imgs.append(img_tk)
                 
-                # Create frame with simple shadow
-                frame = tk.Frame(self.thumbs_frame, bd=0, bg="#f9fafb", highlightbackground="#e0e6ef", highlightthickness=2)
-                frame.grid(row=idx//5, column=idx%5, padx=12, pady=12)
+                # Modern card with rounded corners
+                card = tk.Frame(self.thumbs_frame, bd=0, 
+                               bg=self.colors['bg_card'], 
+                               highlightbackground=self.colors['bg_secondary'], 
+                               highlightthickness=1,
+                               relief=tk.SOLID)
+                card.grid(row=idx//4, column=idx%4, padx=15, pady=15, sticky="nsew")
                 
-                # Simple shadow effect
-                shadow_frame = tk.Frame(frame, bg="#e0e6ef", width=240, height=180)
-                shadow_frame.place(x=4, y=4)
+                # Configure grid weights for responsive layout
+                self.thumbs_frame.grid_columnconfigure(idx%4, weight=1)
                 
-                lbl_img = tk.Label(frame, image=img_tk, bg="#f9fafb")
+                # Image container with padding
+                img_container = tk.Frame(card, bg=self.colors['bg_card'])
+                img_container.pack(fill=tk.BOTH, expand=True, padx=12, pady=(12, 8))
+                
+                # Modern image label
+                lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
                 lbl_img.image = img_tk
                 lbl_img.pack()
                 lbl_img.bind('<Double-Button-1>', lambda e, p=img_path: self.open_full_image(p))
                 
-                # Simple hover effects
-                def on_enter(ev, f=frame, s=shadow_frame):
-                    f.config(bg="#e3eafc", highlightbackground="#a5d8fa")
-                    s.place(x=2, y=2)
-                def on_leave(ev, f=frame, s=shadow_frame):
-                    f.config(bg="#f9fafb", highlightbackground="#e0e6ef")
-                    s.place(x=4, y=4)
+                # Modern hover effects
+                def on_enter(ev, c=card):
+                    c.config(highlightbackground=self.colors['accent'], highlightthickness=2)
+                def on_leave(ev, c=card):
+                    c.config(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
                 
-                frame.bind("<Enter>", on_enter)
-                frame.bind("<Leave>", on_leave)
+                card.bind("<Enter>", on_enter)
+                card.bind("<Leave>", on_leave)
                 lbl_img.bind("<Enter>", on_enter)
                 lbl_img.bind("<Leave>", on_leave)
                 
-                # Text frame for filename and confidence
-                text_frame = tk.Frame(frame, bg="#f9fafb")
-                text_frame.pack(fill=tk.X, pady=4)
+                # Info section at bottom
+                info_frame = tk.Frame(card, bg=self.colors['bg_card'])
+                info_frame.pack(fill=tk.X, padx=12, pady=(0, 12))
                 
+                # Checkbox and filename
                 var = tk.BooleanVar()
-                chk = tk.Checkbutton(text_frame, text=os.path.basename(img_path), variable=var,
+                filename = os.path.basename(img_path)
+                if len(filename) > 25:
+                    filename = filename[:22] + "..."
+                    
+                chk = tk.Checkbutton(info_frame, 
+                                   text=filename, 
+                                   variable=var,
                                    command=lambda v=var, p=img_path: self.on_image_check(v, p),
-                                   font=("Arial", 10), bg="#f9fafb", activebackground="#e3eafc",
-                                   selectcolor="#a5d8fa", bd=0, highlightthickness=0)
-                chk.pack(side=tk.LEFT)
+                                   font=("Segoe UI", 10, "bold"), 
+                                   bg=self.colors['bg_card'],
+                                   fg=self.colors['text_primary'],
+                                   activebackground=self.colors['bg_card'],
+                                   selectcolor=self.colors['accent'], 
+                                   bd=0, highlightthickness=0,
+                                   anchor="w")
+                chk.pack(fill=tk.X, pady=(0, 4))
                 
+                # Confidence score with color coding
                 if img_path in self.confidence_scores:
-                    conf_text = f"{self.confidence_scores[img_path]:.2f}"
-                    conf_label = tk.Label(text_frame, text=conf_text, font=("Arial", 9),
-                                        bg="#f9fafb", fg="#666666")
-                    conf_label.pack(side=tk.RIGHT, padx=4)
+                    confidence = self.confidence_scores[img_path]
+                    conf_text = f"Confidence: {confidence:.0%}"
+                    
+                    # Color code based on confidence
+                    if confidence >= 0.9:
+                        conf_color = self.colors['success']
+                    elif confidence >= 0.7:
+                        conf_color = self.colors['accent']
+                    elif confidence >= 0.5:
+                        conf_color = self.colors['warning']
+                    else:
+                        conf_color = self.colors['danger']
+                    
+                    conf_label = tk.Label(info_frame, 
+                                        text=conf_text, 
+                                        font=("Segoe UI", 9),
+                                        bg=self.colors['bg_card'], 
+                                        fg=conf_color,
+                                        anchor="w")
+                    conf_label.pack(fill=tk.X)
                 
                 self.selected_check_vars.append((var, img_path))
                 var.trace_add('write', lambda *args: self.update_clean_btn_label(self.count_selected_photos()))
@@ -211,60 +246,203 @@ class ImageClassifierApp:
         self.max_thumb_size = (580, 360)  # Maximum size
         
         self.setup_ui()
+        
+        # Apply dark theme after UI setup with multiple attempts
+        self.root.after(100, self.apply_dark_theme_fix)
+        self.root.after(500, self.apply_dark_theme_fix)  # Second attempt
+        self.root.after(1000, self.apply_dark_theme_fix)  # Third attempt
+
+    def apply_dark_theme_fix(self):
+        """Ensure dark theme is properly applied to all components"""
+        try:
+            print("Applying dark theme fix...")
+            
+            # Force tree styling using multiple approaches
+            style = ttk.Style()
+            
+            # Configure both default and custom Treeview styles
+            treeview_config = {
+                'fieldbackground': self.colors['bg_card'],
+                'background': self.colors['bg_card'], 
+                'foreground': self.colors['text_primary'],
+                'borderwidth': 0,
+                'lightcolor': self.colors['bg_card'],
+                'darkcolor': self.colors['bg_card'],
+                'selectbackground': self.colors['accent'],
+                'selectforeground': self.colors['text_primary']
+            }
+            
+            # Apply to both default and custom styles
+            style.configure("Treeview", **treeview_config)
+            style.configure("Modern.Treeview", **treeview_config)
+            
+            # Also set the map for selection states
+            style.map("Treeview",
+                     background=[('selected', self.colors['accent']), ('active', self.colors['bg_secondary'])],
+                     foreground=[('selected', self.colors['text_primary']), ('active', self.colors['text_primary'])])
+            
+            style.map("Modern.Treeview", 
+                     background=[('selected', self.colors['accent']), ('active', self.colors['bg_secondary'])],
+                     foreground=[('selected', self.colors['text_primary']), ('active', self.colors['text_primary'])])
+            
+            # Force apply the style
+            self.tree.configure(style="Modern.Treeview")
+            
+            # Try direct widget configuration as backup
+            try:
+                self.tree.configure(background=self.colors['bg_card'])
+            except Exception as widget_error:
+                print(f"Direct widget config failed: {widget_error}")
+            
+            # Update the placeholder text to force a refresh
+            if hasattr(self, 'tree_placeholder_id'):
+                try:
+                    self.tree.item(self.tree_placeholder_id, 
+                                  text="📁 Select a folder to start classification")
+                except:
+                    pass
+            
+            # Update display
+            self.root.update_idletasks()
+            print("Dark theme fix applied successfully")
+            
+        except Exception as e:
+            print(f"Theme fix error: {e}")
 
     def setup_ui(self):
         import tkinter.ttk as ttk
-        self.root.configure(bg="#f7fafc")
-
-        # Header with soft gradient
-        header = tk.Canvas(self.root, height=60, bg="#e3eafc", highlightthickness=0)
-        header.pack(fill=tk.X)
-        header.create_rectangle(0, 0, 2000, 60, fill="#e3eafc", outline="")
-        header.create_rectangle(0, 0, 2000, 30, fill="#c7d6f7", outline="")
-        header.create_text(32, 30, anchor="w", text="PhotoSift - Find Out Photo Unwanted", font=("Segoe UI", 22, "bold"), fill="#3a4a63")
-
-        # Top frame for folder selection and trash button
-        frm = tk.Frame(self.root, bg="#f7fafc")
-        frm.pack(fill=tk.X, padx=24, pady=(14, 8))
         
-        # Right side container for trash button
-        trash_container = tk.Frame(frm, bg="#f7fafc")
-        trash_container.pack(side=tk.RIGHT)
+        # Modern dark theme colors
+        self.colors = {
+            'bg_primary': '#1e293b',      # Dark blue background
+            'bg_secondary': '#334155',    # Lighter dark blue
+            'bg_card': '#475569',         # Card background
+            'bg_sidebar': '#2d3748',      # Sidebar background
+            'accent': '#3b82f6',          # Blue accent
+            'accent_hover': '#2563eb',    # Blue hover
+            'text_primary': '#f1f5f9',    # White text
+            'text_secondary': '#94a3b8',  # Light gray text
+            'success': '#10b981',         # Green
+            'warning': '#f59e0b',         # Orange
+            'danger': '#ef4444'           # Red
+        }
         
-        # Trash button with counter
-        self.trash_btn_var = tk.StringVar(value="Trash (0)")
-        style_btn = {"font": ("Segoe UI", 12, "bold"), "bg": "#e0e6ef", "activebackground": "#d0d7e6", "activeforeground": "#3a4a63", "bd": 0, "relief": tk.FLAT, "cursor": "hand2", "highlightthickness": 0}
-        self.trash_btn = tk.Button(trash_container, textvariable=self.trash_btn_var, command=self.open_trash_folder, **style_btn)
-        self.trash_btn.pack(side=tk.RIGHT, padx=(0, 0), ipadx=10, ipady=4)
-        self.trash_btn.bind("<Enter>", lambda e: self.trash_btn.config(bg="#d0d7e6"))
-        self.trash_btn.bind("<Leave>", lambda e: self.trash_btn.config(bg="#e0e6ef"))
+        self.root.configure(bg=self.colors['bg_primary'])
+
+        # Modern header
+        header = tk.Frame(self.root, bg=self.colors['bg_primary'], height=80)
+        header.pack(fill=tk.X, padx=20, pady=(20, 0))
+        header.pack_propagate(False)
         
-        # Select folder button
-        btn = tk.Button(frm, text="Select Folder", command=self.select_folder, **style_btn)
-        btn.pack(side=tk.LEFT, padx=(0, 16), ipadx=10, ipady=4)
-        btn.bind("<Enter>", lambda e: btn.config(bg="#d0d7e6"))
-        btn.bind("<Leave>", lambda e: btn.config(bg="#e0e6ef"))
-        self.lbl_folder = tk.Label(frm, text="No folder selected", bg="#f7fafc", font=("Segoe UI", 12, "italic"), fg="#6b7280")
-        self.lbl_folder.pack(side=tk.LEFT, padx=12)
+        # App title section
+        title_frame = tk.Frame(header, bg=self.colors['bg_primary'])
+        title_frame.pack(side=tk.LEFT, fill=tk.Y)
+        
+        title_label = tk.Label(title_frame, 
+                              text="PhotoSift", 
+                              font=("Segoe UI", 28, "bold"),
+                              bg=self.colors['bg_primary'], 
+                              fg=self.colors['text_primary'])
+        title_label.pack(anchor="w")
+        
+        subtitle_label = tk.Label(title_frame, 
+                                 text="Find Out Photo Unwanted", 
+                                 font=("Segoe UI", 14),
+                                 bg=self.colors['bg_primary'], 
+                                 fg=self.colors['text_secondary'])
+        subtitle_label.pack(anchor="w")
 
-        # Main frame for tree and image
-        main_frame = tk.Frame(self.root, bg="#f7fafc")
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=18, pady=(5, 10))
+        # Header buttons frame
+        header_buttons = tk.Frame(header, bg=self.colors['bg_primary'])
+        header_buttons.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Modern trash button with icon
+        self.trash_btn_var = tk.StringVar(value="🗑️ 0")
+        self.trash_btn = tk.Button(header_buttons, 
+                                  textvariable=self.trash_btn_var, 
+                                  command=self.open_trash_folder,
+                                  font=("Segoe UI", 12, "bold"),
+                                  bg=self.colors['bg_secondary'],
+                                  fg=self.colors['text_primary'],
+                                  activebackground=self.colors['bg_card'],
+                                  activeforeground=self.colors['text_primary'],
+                                  bd=0, relief=tk.FLAT, cursor="hand2",
+                                  padx=15, pady=8)
+        self.trash_btn.pack(side=tk.RIGHT, padx=(10, 0))
+        
+        # Main content container
+        content = tk.Frame(self.root, bg=self.colors['bg_primary'])
+        content.pack(fill=tk.BOTH, expand=True, padx=20, pady=(20, 20))
 
-        # Sidebar (Treeview) with rounded corners and soft shadow
-        sidebar = tk.Frame(main_frame, bg="#e9ecf2", width=220, height=500, bd=0, highlightbackground="#dbeafe", highlightthickness=2)
+        # Modern sidebar
+        sidebar = tk.Frame(content, bg=self.colors['bg_sidebar'], width=300)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 20))
         sidebar.pack_propagate(False)
-        sidebar.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 0), pady=6)
-        # Simulate a soft drop shadow for sidebar (right side)
-        sidebar_shadow = tk.Frame(main_frame, bg="#e0e6ef", width=8)
-        sidebar_shadow.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 22), pady=12)
-        tree_label = tk.Label(sidebar, text="Categories", bg="#e9ecf2", font=("Segoe UI", 13, "bold"), anchor="w", fg="#3a4a63")
-        tree_label.pack(fill=tk.X, padx=14, pady=(16, 6))
-        tree_frame = tk.Frame(sidebar, bg="#e9ecf2")
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 14))
-        tree_scroll = tk.Scrollbar(tree_frame, orient=tk.VERTICAL)
-        tree_xscroll = tk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
-        self.tree = ttk.Treeview(tree_frame, yscrollcommand=tree_scroll.set, xscrollcommand=tree_xscroll.set, selectmode="extended", show="tree")
+        
+        # Folder selection section
+        folder_section = tk.Frame(sidebar, bg=self.colors['bg_sidebar'])
+        folder_section.pack(fill=tk.X, padx=20, pady=(20, 15))
+        
+        # Modern select folder button
+        select_btn = tk.Button(folder_section, 
+                              text="Select Folder", 
+                              command=self.select_folder,
+                              font=("Segoe UI", 12, "bold"),
+                              bg=self.colors['accent'],
+                              fg=self.colors['text_primary'],
+                              activebackground=self.colors['accent_hover'],
+                              activeforeground=self.colors['text_primary'],
+                              bd=0, relief=tk.FLAT, cursor="hand2",
+                              padx=20, pady=10)
+        select_btn.pack(fill=tk.X)
+        
+        # Folder path display
+        self.lbl_folder = tk.Label(folder_section, 
+                                  text="No folder selected", 
+                                  bg=self.colors['bg_sidebar'], 
+                                  font=("Segoe UI", 10), 
+                                  fg=self.colors['text_secondary'],
+                                  wraplength=260,
+                                  justify=tk.LEFT)
+        self.lbl_folder.pack(fill=tk.X, pady=(8, 0))
+        
+        # Categories section
+        categories_section = tk.Frame(sidebar, bg=self.colors['bg_sidebar'])
+        categories_section.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        categories_label = tk.Label(categories_section, 
+                                   text="Categories", 
+                                   bg=self.colors['bg_sidebar'], 
+                                   font=("Segoe UI", 14, "bold"), 
+                                   fg=self.colors['text_primary'])
+        categories_label.pack(anchor="w", pady=(0, 10))
+        
+        # Tree frame with dark theme
+        tree_frame = tk.Frame(categories_section, bg=self.colors['bg_card'])
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Create a wrapper frame for the tree with dark background
+        tree_wrapper = tk.Frame(tree_frame, bg=self.colors['bg_card'], bd=0, highlightthickness=0)
+        tree_wrapper.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
+        
+        # Modern scrollbars with dark styling
+        tree_scroll = tk.Scrollbar(tree_wrapper, 
+                                  orient=tk.VERTICAL,
+                                  bg=self.colors['bg_secondary'],
+                                  troughcolor=self.colors['bg_card'],
+                                  activebackground=self.colors['accent'])
+        tree_xscroll = tk.Scrollbar(tree_wrapper, 
+                                   orient=tk.HORIZONTAL,
+                                   bg=self.colors['bg_secondary'],
+                                   troughcolor=self.colors['bg_card'],
+                                   activebackground=self.colors['accent'])
+        
+        # Modern treeview with explicit styling
+        self.tree = ttk.Treeview(tree_wrapper, 
+                                yscrollcommand=tree_scroll.set, 
+                                xscrollcommand=tree_xscroll.set, 
+                                selectmode="extended", 
+                                show="tree")
         tree_scroll.config(command=self.tree.yview)
         tree_xscroll.config(command=self.tree.xview)
         tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
@@ -272,121 +450,213 @@ class ImageClassifierApp:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
         
-        # Configure tree styling to remove empty lines
+        # Configure modern styling
         tree_style = ttk.Style()
-        tree_style.configure("Treeview", rowheight=20, fieldbackground="#e9ecf2")
-        tree_style.configure("Treeview.Item", padding=(2, 0, 2, 0))
+        
+        # Set a dark theme as base - try multiple themes
+        try:
+            # Try different themes that work better with dark styling
+            available_themes = tree_style.theme_names()
+            # Try themes in order of best dark support
+            if 'clam' in available_themes:
+                tree_style.theme_use('clam')
+                print("Using 'clam' theme for better dark styling")
+            elif 'alt' in available_themes:
+                tree_style.theme_use('alt')
+                print("Using 'alt' theme")
+            else:
+                print("Using default theme")
+        except Exception as e:
+            print(f"Theme error: {e}")
+            pass  # Fall back to default if theme not available
+        
+        # Modern treeview styling with proper colors
+        tree_style.configure("Modern.Treeview", 
+                           rowheight=28, 
+                           fieldbackground=self.colors['bg_card'],
+                           background=self.colors['bg_card'],
+                           foreground=self.colors['text_primary'],
+                           borderwidth=0,
+                           relief="flat",
+                           insertcolor=self.colors['text_primary'],
+                           focuscolor=self.colors['accent'])
+        
+        # Configure treeview item padding and colors
+        tree_style.configure("Modern.Treeview.Item", 
+                           padding=(12, 4, 12, 4),
+                           background=self.colors['bg_card'],
+                           foreground=self.colors['text_primary'])
+        
+        # Configure selection colors
+        tree_style.map("Modern.Treeview",
+                      background=[('selected', self.colors['accent']),
+                                ('active', self.colors['bg_secondary'])],
+                      foreground=[('selected', self.colors['text_primary']),
+                                ('active', self.colors['text_primary'])])
+        
+        # Apply the modern style immediately
+        self.tree.configure(style="Modern.Treeview")
+        
+        # Force update the tree styling
+        self.root.update_idletasks()
+        
+        # Modern scrollbar styling
+        tree_style.configure("Modern.Vertical.TScrollbar",
+                           background=self.colors['bg_secondary'],
+                           troughcolor=self.colors['bg_primary'],
+                           borderwidth=0,
+                           arrowcolor=self.colors['text_secondary'],
+                           darkcolor=self.colors['bg_secondary'],
+                           lightcolor=self.colors['bg_secondary'])
+        
+        # Configure tag styles for placeholder
+        self.tree.tag_configure("placeholder", 
+                               foreground=self.colors['text_secondary'],
+                               background=self.colors['bg_card'])
+        
+        # Add placeholder content to show proper styling immediately
+        placeholder_id = self.tree.insert("", "end", 
+                                         text="📁 Select a folder to start classification", 
+                                         tags=("placeholder",))
+        
+        # Store placeholder ID for later removal
+        self.tree_placeholder_id = placeholder_id
+        
+        # Force another update to ensure styling is applied
+        self.root.update_idletasks()
 
-        # Card-like main content area with rounded corners and shadow
-        card = tk.Frame(main_frame, bg="#f9fafb", bd=0, highlightbackground="#dbeafe", highlightthickness=2)
-        card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 0), pady=0)
+        # Modern main area
+        main_area = tk.Frame(content, bg=self.colors['bg_primary'])
+        main_area.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
-        # Add zoom controls
-        zoom_frame = tk.Frame(card, bg="#f9fafb")
-        zoom_frame.pack(fill=tk.X, padx=10, pady=5)
+        # Navigation bar
+        nav_bar = tk.Frame(main_area, bg=self.colors['bg_primary'], height=60)
+        nav_bar.pack(fill=tk.X, pady=(0, 20))
+        nav_bar.pack_propagate(False)
         
-        # Add zoom out button
-        self.zoom_out_btn = tk.Button(zoom_frame, text="🔍-", command=self.zoom_out, 
-                                    font=("Segoe UI", 12), bg="#e0e6ef", activebackground="#d0d7e6",
-                                    bd=0, relief=tk.FLAT, cursor="hand2", highlightthickness=0)
-        self.zoom_out_btn.pack(side=tk.LEFT, padx=5, ipadx=8, ipady=2)
+        # Zoom controls (left side)
+        zoom_frame = tk.Frame(nav_bar, bg=self.colors['bg_primary'])
+        zoom_frame.pack(side=tk.LEFT, fill=tk.Y)
         
-        # Add zoom in button
-        self.zoom_in_btn = tk.Button(zoom_frame, text="🔍+", command=self.zoom_in,
-                                   font=("Segoe UI", 12), bg="#e0e6ef", activebackground="#d0d7e6",
-                                   bd=0, relief=tk.FLAT, cursor="hand2", highlightthickness=0)
-        self.zoom_in_btn.pack(side=tk.LEFT, padx=5, ipadx=8, ipady=2)
+        self.zoom_out_btn = tk.Button(zoom_frame, 
+                                     text="🔍-", 
+                                     command=self.zoom_out,
+                                     font=("Segoe UI", 14),
+                                     bg=self.colors['bg_secondary'],
+                                     fg=self.colors['text_primary'],
+                                     activebackground=self.colors['bg_card'],
+                                     bd=0, relief=tk.FLAT, cursor="hand2",
+                                     padx=12, pady=8)
+        self.zoom_out_btn.pack(side=tk.LEFT, padx=(0, 5))
         
-        # Add zoom level label
-        self.zoom_label = tk.Label(zoom_frame, text="Zoom: 100%", bg="#f9fafb", font=("Segoe UI", 10))
-        self.zoom_label.pack(side=tk.LEFT, padx=10)
+        self.zoom_in_btn = tk.Button(zoom_frame, 
+                                    text="🔍+", 
+                                    command=self.zoom_in,
+                                    font=("Segoe UI", 14),
+                                    bg=self.colors['bg_secondary'],
+                                    fg=self.colors['text_primary'],
+                                    activebackground=self.colors['bg_card'],
+                                    bd=0, relief=tk.FLAT, cursor="hand2",
+                                    padx=12, pady=8)
+        self.zoom_in_btn.pack(side=tk.LEFT, padx=(0, 10))
         
-        # Simulate a soft drop shadow for card (right side)
-        card_shadow = tk.Frame(main_frame, bg="#e0e6ef", width=12)
-        card_shadow.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 0), pady=18)
+        self.zoom_label = tk.Label(zoom_frame, 
+                                  text="100%", 
+                                  font=("Segoe UI", 12), 
+                                  bg=self.colors['bg_primary'], 
+                                  fg=self.colors['text_secondary'])
+        self.zoom_label.pack(side=tk.LEFT, fill=tk.Y)
 
-        # Right frame for selected thumbnails with buttons (inside card)
-        self.right_frame = tk.Frame(card, bg="#f9fafb")
-        self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        # Clean button frame (right side)
-        clean_btn_frame = tk.Frame(self.right_frame, bg="#f9fafb")
-        clean_btn_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 12), pady=16)
-        # Select All button
-        self.select_all_btn = tk.Button(clean_btn_frame, text="Select All", font=("Segoe UI", 12, "bold"), bg="#a5d8fa", fg="#3a4a63", activebackground="#74c0fc", activeforeground="#22223b", bd=0, relief=tk.FLAT, padx=20, pady=10, cursor="hand2", highlightthickness=0)
-        self.select_all_btn.config(command=self.select_all_photos, borderwidth=0, highlightbackground="#a5d8fa", highlightcolor="#a5d8fa")
-        self.select_all_btn.pack(side=tk.TOP, anchor="ne", pady=(12, 10), ipadx=8, ipady=4)
-        self.select_all_btn.bind("<Enter>", lambda e: self.select_all_btn.config(bg="#b6e0fe"))
-        self.select_all_btn.bind("<Leave>", lambda e: self.select_all_btn.config(bg="#a5d8fa"))
-
+        # Action buttons (right side of nav bar)
+        action_frame = tk.Frame(nav_bar, bg=self.colors['bg_primary'])
+        action_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Modern Select All button
+        self.select_all_btn = tk.Button(action_frame, 
+                                       text="Select All", 
+                                       command=self.select_all_photos,
+                                       font=("Segoe UI", 12, "bold"),
+                                       bg=self.colors['accent'],
+                                       fg=self.colors['text_primary'],
+                                       activebackground=self.colors['accent_hover'],
+                                       bd=0, relief=tk.FLAT, cursor="hand2",
+                                       padx=16, pady=8)
+        self.select_all_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Modern Clean button
         self.clean_btn_var = tk.StringVar()
         self.clean_btn_var.set("Clean (0)")
-        self.clean_btn = tk.Button(clean_btn_frame, textvariable=self.clean_btn_var, font=("Segoe UI", 12, "bold"), bg="#ffb4a2", fg="#3a4a63", activebackground="#ff7f51", activeforeground="#fff", bd=0, relief=tk.FLAT, padx=20, pady=10, cursor="hand2", highlightthickness=0)
-        self.clean_btn.config(command=self.clean_selected_photos, borderwidth=0, highlightbackground="#ffb4a2", highlightcolor="#ffb4a2")
-        self.clean_btn.pack(side=tk.TOP, anchor="ne", pady=(0,0), ipadx=8, ipady=4)
-        self.clean_btn.bind("<Enter>", lambda e: self.clean_btn.config(bg="#ffd6c0"))
-        self.clean_btn.bind("<Leave>", lambda e: self.clean_btn.config(bg="#ffb4a2"))
+        self.clean_btn = tk.Button(action_frame, 
+                                  textvariable=self.clean_btn_var,
+                                  command=self.clean_selected_photos,
+                                  font=("Segoe UI", 12, "bold"),
+                                  bg=self.colors['danger'],
+                                  fg=self.colors['text_primary'],
+                                  activebackground='#dc2626',
+                                  bd=0, relief=tk.FLAT, cursor="hand2",
+                                  padx=16, pady=8)
+        self.clean_btn.pack(side=tk.LEFT)
+        
+        # Main content area
+        self.right_frame = tk.Frame(main_area, bg=self.colors['bg_primary'])
+        self.right_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Page navigation controls
-        self.page_frame = tk.Frame(self.right_frame, bg="#f9fafb")
-        self.page_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 0))
+        # Modern pagination controls
+        self.page_frame = tk.Frame(self.right_frame, bg=self.colors['bg_primary'], height=50)
+        self.page_frame.pack(fill=tk.X, pady=(0, 20))
+        self.page_frame.pack_propagate(False)
         
-        nav_btn_style = {"font": ("Segoe UI", 11), "bg": "#e0e6ef", "fg": "#3a4a63",
-                         "activebackground": "#d0d7e6", "activeforeground": "#3a4a63",
-                         "bd": 0, "padx": 15, "pady": 5, "cursor": "hand2"}
+        # Center container for navigation
+        nav_center = tk.Frame(self.page_frame, bg=self.colors['bg_primary'])
+        nav_center.pack(expand=True)
         
-        self.prev_page_btn = tk.Button(self.page_frame, text="← Previous", command=self.prev_page, **nav_btn_style)
-        self.prev_page_btn.pack(side=tk.LEFT)
+        # Modern navigation buttons
+        nav_btn_style = {"font": ("Segoe UI", 12), 
+                        "bg": self.colors['bg_secondary'], 
+                        "fg": self.colors['text_primary'],
+                        "activebackground": self.colors['bg_card'], 
+                        "activeforeground": self.colors['text_primary'],
+                        "bd": 0, "padx": 20, "pady": 8, "cursor": "hand2"}
         
-        self.page_label = tk.Label(self.page_frame, text="Page 1", font=("Segoe UI", 11), bg="#f9fafb", fg="#3a4a63")
+        self.prev_page_btn = tk.Button(nav_center, text="← Previous", command=self.prev_page, **nav_btn_style)
+        self.prev_page_btn.pack(side=tk.LEFT, padx=(0, 15))
+        
+        self.page_label = tk.Label(nav_center, text="Page 1 of 5", 
+                                  font=("Segoe UI", 12, "bold"), 
+                                  bg=self.colors['bg_primary'], 
+                                  fg=self.colors['text_primary'])
         self.page_label.pack(side=tk.LEFT, padx=20)
         
-        self.next_page_btn = tk.Button(self.page_frame, text="Next →", command=self.next_page, **nav_btn_style)
-        self.next_page_btn.pack(side=tk.LEFT)
+        self.next_page_btn = tk.Button(nav_center, text="Next →", command=self.next_page, **nav_btn_style)
+        self.next_page_btn.pack(side=tk.LEFT, padx=(15, 0))
         
         self.page_frame.pack_forget()  # Hide initially
         
-        # Main container for page controls and thumbnails
-        self.content_frame = tk.Frame(self.right_frame, bg="#f9fafb")
+        # Main container for thumbnails
+        self.content_frame = tk.Frame(self.right_frame, bg=self.colors['bg_primary'])
         self.content_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Page navigation controls - centered at top
-        self.page_frame = tk.Frame(self.content_frame, bg="#f9fafb")
-        self.page_frame.pack(fill=tk.X, padx=10, pady=(10, 20))
+        # Modern thumbnail container
+        self.thumb_container = tk.Frame(self.content_frame, bg=self.colors['bg_primary'])
+        self.thumb_container.pack(fill=tk.BOTH, expand=True, padx=20)
         
-        # Center container for navigation
-        nav_center = tk.Frame(self.page_frame, bg="#f9fafb")
-        nav_center.pack(expand=True, fill=tk.X)
+        # Modern canvas and scrollbar
+        self.thumb_canvas = tk.Canvas(self.thumb_container, 
+                                     bg=self.colors['bg_primary'], 
+                                     highlightthickness=0, 
+                                     bd=0)
         
-        # Create a nested frame for the buttons to ensure center alignment
-        nav_buttons = tk.Frame(nav_center, bg="#f9fafb")
-        nav_buttons.pack(expand=True, anchor="center")
-        
-        nav_btn_style = {"font": ("Segoe UI", 11), "bg": "#e0e6ef", "fg": "#3a4a63",
-                         "activebackground": "#d0d7e6", "activeforeground": "#3a4a63",
-                         "bd": 0, "padx": 15, "pady": 5, "cursor": "hand2"}
-        
-        self.prev_page_btn = tk.Button(nav_buttons, text="\u2190 Previous", command=self.prev_page, **nav_btn_style)
-        self.prev_page_btn.pack(side=tk.LEFT, padx=(0, 10))
-        
-        self.page_label = tk.Label(nav_buttons, text="Page 1", font=("Segoe UI", 11), bg="#f9fafb", fg="#3a4a63")
-        self.page_label.pack(side=tk.LEFT, padx=20)
-        
-        self.next_page_btn = tk.Button(nav_buttons, text="Next \u2192", command=self.next_page, **nav_btn_style)
-        self.next_page_btn.pack(side=tk.LEFT, padx=(10, 0))
-        
-        # Thumbnail container
-        self.thumb_container = tk.Frame(self.content_frame, bg="#f9fafb")
-        self.thumb_container.pack(fill=tk.BOTH, expand=True, padx=10)
-        
-        # Thumbnail canvas and scrollbar
-        self.thumb_canvas = tk.Canvas(self.thumb_container, bg="#f9fafb", highlightthickness=0, bd=0)
-        self.thumb_scrollbar = tk.Scrollbar(self.thumb_container, orient=tk.VERTICAL, command=self.thumb_canvas.yview)
+        # Modern styled scrollbar
+        self.thumb_scrollbar = ttk.Scrollbar(self.thumb_container, 
+                                           orient=tk.VERTICAL, 
+                                           command=self.thumb_canvas.yview,
+                                           style="Modern.Vertical.TScrollbar")
         self.thumb_canvas.configure(yscrollcommand=self.thumb_scrollbar.set)
         self.thumb_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.thumb_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Create thumbs frame first
-        self.thumbs_frame = tk.Frame(self.thumb_canvas, bg="#f9fafb")
+        # Create modern thumbs frame
+        self.thumbs_frame = tk.Frame(self.thumb_canvas, bg=self.colors['bg_primary'])
         self.thumb_canvas.create_window((0,0), window=self.thumbs_frame, anchor="nw")
         self.thumbs_frame.bind("<Configure>", lambda e: self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all")))
         
@@ -440,19 +710,38 @@ class ImageClassifierApp:
         self.thumb_imgs = []
         self.right_frame.pack_forget()  # Hide initially
 
-        # Center frame for image and controls (inside card)
-        self.center_frame = tk.Frame(card, bg="#f9fafb")
+        # Center frame for single image view
+        self.center_frame = tk.Frame(main_area, bg=self.colors['bg_primary'])
         self.center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.img_panel = tk.Label(self.center_frame, bg="#f9fafb", bd=0, highlightbackground="#b0b6c6", highlightthickness=1, relief=tk.GROOVE)
-        self.img_panel.pack(pady=(44, 16), ipadx=6, ipady=6)
-        self.lbl_result = tk.Label(self.center_frame, text="", font=("Segoe UI", 17, "bold"), bg="#f9fafb", fg="#3a4a63")
+        
+        # Modern image panel
+        self.img_panel = tk.Label(self.center_frame, 
+                                 bg=self.colors['bg_primary'], 
+                                 bd=0)
+        self.img_panel.pack(pady=(40, 16), ipadx=6, ipady=6)
+        
+        # Modern result label
+        self.lbl_result = tk.Label(self.center_frame, 
+                                  text="", 
+                                  font=("Segoe UI", 18, "bold"), 
+                                  bg=self.colors['bg_primary'], 
+                                  fg=self.colors['text_primary'])
         self.lbl_result.pack(pady=10)
 
-        # Status bar at bottom, full width
+        # Modern status bar at bottom
+        status_frame = tk.Frame(self.root, bg=self.colors['bg_secondary'], height=35)
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        status_frame.pack_propagate(False)
+        
         self.status_var = tk.StringVar()
         self.status_var.set("")
-        self.status_bar = tk.Label(self.root, textvariable=self.status_var, bd=0, relief=tk.FLAT, anchor=tk.W, bg="#c7d6f7", fg="#3a4a63", font=("Segoe UI", 11))
-        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(0,2))
+        self.status_bar = tk.Label(status_frame, 
+                                  textvariable=self.status_var, 
+                                  bd=0, relief=tk.FLAT, anchor=tk.W, 
+                                  bg=self.colors['bg_secondary'], 
+                                  fg=self.colors['text_secondary'], 
+                                  font=("Segoe UI", 11))
+        self.status_bar.pack(fill=tk.BOTH, expand=True, padx=20)
 
     def on_canvas_configure(self, event=None):
         # Update scroll region
@@ -469,42 +758,55 @@ class ImageClassifierApp:
             self.show_selected_thumbnails(self.current_paths, force_page=True)
     
     def show_progress_window(self, total):
-        # Create progress window
+        # Create modern progress window
         self.progress_window = tk.Toplevel(self.root)
         self.progress_window.title("Processing Images")
-        self.progress_window.geometry("400x150")
+        self.progress_window.geometry("450x180")
         self.progress_window.transient(self.root)
         self.progress_window.grab_set()
         
         # Center the progress window
-        window_width = 400
-        window_height = 150
+        window_width = 450
+        window_height = 180
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
         self.progress_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
         
-        # Configure progress window
-        self.progress_window.configure(bg="#f7fafc")
-        frame = tk.Frame(self.progress_window, bg="#f7fafc", padx=20, pady=20)
+        # Modern progress window styling
+        self.progress_window.configure(bg=self.colors['bg_primary'])
+        frame = tk.Frame(self.progress_window, bg=self.colors['bg_primary'], padx=30, pady=25)
         frame.pack(fill=tk.BOTH, expand=True)
         
-        # Progress label
-        self.progress_label = tk.Label(frame, text="Initializing...", font=("Segoe UI", 11), bg="#f7fafc")
-        self.progress_label.pack(pady=(0, 10))
+        # Modern progress label
+        self.progress_label = tk.Label(frame, 
+                                      text="Initializing AI Classification...", 
+                                      font=("Segoe UI", 13, "bold"), 
+                                      bg=self.colors['bg_primary'],
+                                      fg=self.colors['text_primary'])
+        self.progress_label.pack(pady=(0, 15))
         
-        # Progress bar
+        # Modern progress bar
         self.progress_var = tk.DoubleVar()
         style = ttk.Style()
-        style.configure("Custom.Horizontal.TProgressbar", thickness=15, background='#3399ff')
-        self.progress_bar = ttk.Progressbar(frame, style="Custom.Horizontal.TProgressbar", 
-                                          length=360, mode='determinate', 
+        style.configure("Modern.Horizontal.TProgressbar", 
+                       thickness=20, 
+                       background=self.colors['accent'],
+                       troughcolor=self.colors['bg_secondary'],
+                       borderwidth=0)
+        self.progress_bar = ttk.Progressbar(frame, 
+                                          style="Modern.Horizontal.TProgressbar", 
+                                          length=390, mode='determinate', 
                                           maximum=total, variable=self.progress_var)
-        self.progress_bar.pack(pady=(0, 10))
+        self.progress_bar.pack(pady=(0, 15))
         
-        # Detailed status
-        self.progress_detail = tk.Label(frame, text="", font=("Segoe UI", 10), bg="#f7fafc", fg="#666666")
+        # Modern detailed status
+        self.progress_detail = tk.Label(frame, 
+                                       text="", 
+                                       font=("Segoe UI", 11), 
+                                       bg=self.colors['bg_primary'], 
+                                       fg=self.colors['text_secondary'])
         self.progress_detail.pack()
 
     def update_progress(self, current, total, status_text, detail_text):
@@ -546,7 +848,14 @@ class ImageClassifierApp:
         folder = filedialog.askdirectory()
         if folder:
             self.folder = folder
-            self.lbl_folder.config(text=folder)
+            # Show shorter path for better display
+            display_path = folder
+            if len(display_path) > 50:
+                parts = display_path.split(os.sep)
+                if len(parts) > 3:
+                    display_path = f"...{os.sep}{os.sep.join(parts[-2:])}"
+            
+            self.lbl_folder.config(text=display_path, fg=self.colors['text_primary'])
             self.update_trash_count()  # Update trash count when folder is selected
             # Walk through directory but exclude Trash folder
             self.images = []
@@ -566,7 +875,6 @@ class ImageClassifierApp:
             
             # Show progress window
             self.root.after(0, self.show_progress_window, total)
-            self.status_bar.config(bg="#3399ff", fg="white")
             self.status_var.set(f"Processing 0/{total} images (0%)...")
             self.root.update_idletasks()
 
@@ -585,7 +893,6 @@ class ImageClassifierApp:
                     # Update both progress window and status bar
                     self.root.after(0, self.update_progress, end, total, status_text, detail_text)
                     self.root.after(0, self.status_var.set, f"Processing images {start+1}-{end}/{total} ({percent}%)")
-                    self.root.after(0, self.status_bar.config, {"bg": "#3399ff", "fg": "white"})
                     
                     batch_results = classify_people_vs_screenshot_batch(batch_paths)
                     for p, result in zip(batch_paths, batch_results):
@@ -629,7 +936,9 @@ class ImageClassifierApp:
             threading.Thread(target=process_images, daemon=True).start()
 
     def populate_tree(self):
+        # Clear all existing items including placeholder
         self.tree.delete(*self.tree.get_children())
+        
         people_count = len(self.people_images)
         screenshot_count = len(self.screenshot_images)
         people_node = self.tree.insert("", "end", text=f"People ({people_count})", open=False)  # Collapsed by default
@@ -805,6 +1114,13 @@ class ImageClassifierApp:
         
         # Update navigation controls
         self.update_page_controls()
+        
+        # Show pagination if there are multiple pages
+        total_pages = max(1, (len(self.current_paths) - 1) // self.page_size + 1)
+        if total_pages > 1:
+            self.page_frame.pack(fill=tk.X, pady=(0, 20))
+        else:
+            self.page_frame.pack_forget()
         
         # Configure grid for proper spacing
         cols = self.calculate_columns()
