@@ -575,10 +575,16 @@ class ImageClassifierApp:
         screenshot_count = len(self.screenshot_images)
         people_node = self.tree.insert("", "end", text=f"People ({people_count})", open=False)  # Collapsed by default
         for p in self.people_images:
-            self.tree.insert(people_node, "end", text=os.path.basename(p), values=(p,))
+            # Add confidence score to the display text
+            confidence = self.confidence_scores.get(p, 0.0)
+            display_text = f"{os.path.basename(p)} ({confidence:.2f})"
+            self.tree.insert(people_node, "end", text=display_text, values=(p,))
         screenshot_node = self.tree.insert("", "end", text=f"Screenshot ({screenshot_count})", open=True)  # Expanded by default
         for p in self.screenshot_images:
-            self.tree.insert(screenshot_node, "end", text=os.path.basename(p), values=(p,))
+            # Add confidence score to the display text
+            confidence = self.confidence_scores.get(p, 0.0)
+            display_text = f"{os.path.basename(p)} ({confidence:.2f})"
+            self.tree.insert(screenshot_node, "end", text=display_text, values=(p,))
         
         # Select the Screenshot node by default
         if screenshot_count > 0:
