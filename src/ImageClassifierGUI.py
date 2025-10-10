@@ -136,7 +136,8 @@ class ImageClassifierApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Find Out Photo Unwanted")
-        self.root.geometry("800x600")
+        # Maximize window on startup
+        self.root.state('zoomed')  # Windows maximized state
         self.folder = None
         self.images = []
         self.current = 0
@@ -572,12 +573,19 @@ class ImageClassifierApp:
         self.tree.delete(*self.tree.get_children())
         people_count = len(self.people_images)
         screenshot_count = len(self.screenshot_images)
-        people_node = self.tree.insert("", "end", text=f"People ({people_count})", open=True)
+        people_node = self.tree.insert("", "end", text=f"People ({people_count})", open=False)  # Collapsed by default
         for p in self.people_images:
             self.tree.insert(people_node, "end", text=os.path.basename(p), values=(p,))
-        screenshot_node = self.tree.insert("", "end", text=f"Screenshot ({screenshot_count})", open=True)
+        screenshot_node = self.tree.insert("", "end", text=f"Screenshot ({screenshot_count})", open=True)  # Expanded by default
         for p in self.screenshot_images:
             self.tree.insert(screenshot_node, "end", text=os.path.basename(p), values=(p,))
+        
+        # Select the Screenshot node by default
+        if screenshot_count > 0:
+            self.tree.selection_set(screenshot_node)
+            self.tree.focus(screenshot_node)
+            # Trigger the selection event to show screenshot images
+            self.on_tree_select(None)
     def on_tree_select(self, event):
         selected = self.tree.selection()
         if not selected:
