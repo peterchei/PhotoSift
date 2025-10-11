@@ -12,60 +12,7 @@ from PIL import Image, ImageTk
 # Local imports
 from ImageClassification import classify_people_vs_screenshot, IMG_EXT
 from ImageClassification import classify_people_vs_screenshot_batch
-
-class ToolTip:
-    """Create a tooltip for a given widget"""
-    def __init__(self, widget, text='widget info'):
-        self.widget = widget
-        self.text = text
-        self.tipwindow = None
-        self.id = None
-        self.x = self.y = 0
-        self.widget.bind('<Enter>', self.enter)
-        self.widget.bind('<Leave>', self.leave)
-        self.widget.bind('<Motion>', self.motion)
-
-    def enter(self, event=None):
-        self.schedule()
-
-    def leave(self, event=None):
-        self.unschedule()
-        self.hidetip()
-
-    def motion(self, event=None):
-        self.unschedule()
-        self.schedule()
-
-    def schedule(self):
-        self.unschedule()
-        self.id = self.widget.after(500, self.showtip)  # 500ms delay
-
-    def unschedule(self):
-        id_ = self.id
-        self.id = None
-        if id_:
-            self.widget.after_cancel(id_)
-
-    def showtip(self):
-        if self.tipwindow:
-            return
-        x = self.widget.winfo_rootx() + 25
-        y = self.widget.winfo_rooty() + 25
-        self.tipwindow = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(True)
-        tw.wm_geometry(f"+{x}+{y}")
-        tw.configure(bg='#ffffe0', relief='solid', borderwidth=1)
-        label = tk.Label(tw, text=self.text, justify=tk.LEFT,
-                        background='#ffffe0', foreground='#000000',
-                        relief='flat', borderwidth=0,
-                        font=("Segoe UI", 10))
-        label.pack(ipadx=8, ipady=4)
-
-    def hidetip(self):
-        tw = self.tipwindow
-        self.tipwindow = None
-        if tw:
-            tw.destroy()
+from CommonUI import ToolTip
 
 class ImageClassifierApp:
     def select_all_photos(self):
