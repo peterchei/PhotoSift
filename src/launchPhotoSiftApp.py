@@ -286,6 +286,7 @@ def preload_models():
                 # This will block, but progress bar is already at 75%
                 from ImageClassification import classify_people_vs_screenshot, IMG_EXT
                 from ImageClassification import classify_people_vs_screenshot_batch
+                from DuplicateImageIdentifier import get_clip_embedding_batch
                 splash.root.after(0, lambda: finalize_loading())
             except Exception as e:
                 splash.root.after(0, lambda: handle_error(str(e)))
