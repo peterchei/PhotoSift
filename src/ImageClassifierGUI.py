@@ -194,6 +194,9 @@ class ImageClassifierApp:
         self.min_thumb_size = (60, 45)  # Minimum size
         self.max_thumb_size = (580, 360)  # Maximum size
         
+        # Cleaning operation flag
+        self._cleaning_in_progress = False
+        
         # Use centralized color scheme
         self.colors = ModernColors.get_color_scheme()
         
@@ -1214,14 +1217,23 @@ class ImageClassifierApp:
         return sum(var.get() for var, _ in self.selected_check_vars)
 
     def update_clean_btn_label(self, count):
-        self.clean_btn_var.set(f"Clean ({count})")
+        # Skip update during cleaning to prevent flicker
+        if not getattr(self, '_cleaning_in_progress', False):
+            self.clean_btn_var.set(f"Clean ({count})")
 
     def clean_selected_photos(self):
+        # Prevent concurrent cleaning operations
+        if self._cleaning_in_progress:
+            return
+            
         # Get selected photos
         selected = [img_path for var, img_path in self.selected_check_vars if var.get()]
         if not selected:
             messagebox.showinfo("Clean", "No photos selected.")
             return
+
+        # Set cleaning flag
+        self._cleaning_in_progress = True
 
 
         # Create Trash directory if it doesn't exist
@@ -1374,24 +1386,98 @@ class ImageClassifierApp:
             messagebox.showinfo("Clean Complete", 
                               f"Moved {moved_count} photos to Trash")
         
-        # Auto-close after 1 second
-        popup.after(1000, popup.destroy)
+        # Refresh UI efficiently - only update what's needed
+        try:
+            self.refresh_after_clean(selected)
+        finally:
+            # Reset cleaning flag
+            self._cleaning_in_progress = False
 
-        # Refresh UI
-        self.populate_tree()  # Update the category tree
-        self.update_trash_count()  # Update the trash count
-        
-        # If we're in thumbnail view, refresh it
-        if self.current_paths:
-            # Remove cleaned images from current_paths
-            self.current_paths = [p for p in self.current_paths if p not in selected]
+    def refresh_after_clean(self, cleaned_paths):
+        """Efficiently refresh UI after cleaning images, avoiding multiple rebuilds"""
+        try:
+            # Update tree counts without full rebuild
+            self.update_tree_counts()
+            
+            # Update trash count
+            self.update_trash_count()
+            
+            # If we're in thumbnail view, remove cleaned images efficiently
+            if self.current_paths:
+                # Remove cleaned images from current_paths
+                self.current_paths = [p for p in self.current_paths if p not in cleaned_paths]
+                
+                if self.current_paths:
+                    # Instead of full rebuild, just remove the cleaned thumbnails
+                    self.remove_cleaned_thumbnails(cleaned_paths)
+                else:
+                    # No images left in current view
+                    self.right_frame.pack_forget()
+                    self.center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+                    self.content_frame.pack_forget()
+                    
+        except Exception as e:
+            print(f"Error during refresh: {e}")
+            # Fallback to full refresh if needed
+            self.populate_tree()
+
+    def update_tree_counts(self):
+        """Update tree item counts without full rebuild"""
+        try:
+            # Update root items with current counts and remove cleaned items
+            people_count = len([p for p in self.people_images if os.path.exists(p)])
+            screenshot_count = len([p for p in self.screenshot_images if os.path.exists(p)])
+            
+            # Find and update tree items
+            for item in self.tree.get_children():
+                text = self.tree.item(item, 'text')
+                if 'People' in text:
+                    self.tree.item(item, text=f"People ({people_count})")
+                    # Remove cleaned image items from People category
+                    self.remove_cleaned_tree_items(item)
+                elif 'Screenshot' in text:
+                    self.tree.item(item, text=f"Screenshot ({screenshot_count})")
+                    # Remove cleaned image items from Screenshot category
+                    self.remove_cleaned_tree_items(item)
+                    
+        except Exception as e:
+            print(f"Error updating tree counts: {e}")
+    
+    def remove_cleaned_tree_items(self, parent_item):
+        """Remove tree items for images that no longer exist"""
+        try:
+            children_to_remove = []
+            for child in self.tree.get_children(parent_item):
+                child_data = self.tree.item(child)
+                if child_data['values']:
+                    file_path = child_data['values'][0]
+                    # If the file doesn't exist anymore, mark for removal
+                    if not os.path.exists(file_path):
+                        children_to_remove.append(child)
+            
+            # Remove the marked items
+            for child in children_to_remove:
+                self.tree.delete(child)
+                
+        except Exception as e:
+            print(f"Error removing cleaned tree items: {e}")
+
+    def remove_cleaned_thumbnails(self, cleaned_paths):
+        """Remove specific thumbnails without rebuilding entire view"""
+        try:
+            # Remove cleaned images from selected_check_vars
+            self.selected_check_vars = [(var, path) for var, path in self.selected_check_vars 
+                                      if path not in cleaned_paths]
+            
+            # Since thumbnails don't have img_path attributes, just refresh the current view
+            # This is still more efficient than full tree rebuild
             if self.current_paths:
                 self.show_selected_thumbnails(self.current_paths, force_page=True)
-            else:
-                # No images left in current view
-                self.right_frame.pack_forget()
-                self.center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-                self.content_frame.pack_forget()
+                
+        except Exception as e:
+            print(f"Error removing thumbnails: {e}")
+            # Fallback to full refresh
+            self.show_selected_thumbnails(self.current_paths, force_page=True)
 
     def open_full_image(self, img_path):
         """Open image in full-size window using common utility"""
