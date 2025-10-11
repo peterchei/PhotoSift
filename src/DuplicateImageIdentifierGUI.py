@@ -283,6 +283,9 @@ class DuplicateImageIdentifierApp:
                 display_path = "..." + display_path[-32:]
             self.lbl_folder.config(text=display_path, fg=self.colors['text_primary'])
             
+            # Update trash count when folder is selected
+            self.update_trash_count()
+            
             # Clear tree
             self.tree.delete(*self.tree.get_children())
             
@@ -898,6 +901,21 @@ class DuplicateImageIdentifierApp:
             if img_path in group:
                 group.remove(img_path)
 
+    def update_trash_count(self):
+        """Update trash button with count of files in trash directory"""
+        if self.folder:
+            trash_path = os.path.join(self.folder, "Trash")
+            if os.path.exists(trash_path):
+                # Count image files in trash
+                count = sum(1 for f in os.listdir(trash_path) 
+                         if os.path.isfile(os.path.join(trash_path, f)) 
+                         and os.path.splitext(f)[1].lower() in IMG_EXT)
+                self.trash_btn_var.set(f"🗑️ {count}")
+            else:
+                self.trash_btn_var.set("🗑️ 0")
+        else:
+            self.trash_btn_var.set("🗑️ 0")
+
     def open_trash_folder(self):
         """Open the local Trash folder in the selected directory"""
         if not self.folder:
@@ -1087,6 +1105,9 @@ class DuplicateImageIdentifierApp:
                     
                     # Update clean button count
                     self.update_clean_button_count()
+                    
+                    # Update trash count
+                    self.update_trash_count()
                     
                     # Update status
                     if hasattr(self, 'status_bar'):
