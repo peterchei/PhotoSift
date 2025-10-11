@@ -286,9 +286,17 @@ class DuplicateImageIdentifierApp:
             # Clear tree
             self.tree.delete(*self.tree.get_children())
             
-            # Get all image files first
-            files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(folder)
-                     for f in filenames if os.path.splitext(f)[1].lower() in IMG_EXT]
+            # Get all image files first, excluding Trash folder
+            files = []
+            for dp, dn, filenames in os.walk(folder):
+                # Skip the Trash directory and its subdirectories
+                if "Trash" in dp.split(os.sep):
+                    continue
+                    
+                # Add valid images to the list
+                for f in filenames:
+                    if os.path.splitext(f)[1].lower() in IMG_EXT:
+                        files.append(os.path.join(dp, f))
             total = len(files)
             
             if total == 0:
@@ -977,23 +985,28 @@ class DuplicateImageIdentifierApp:
     def refresh_after_clean(self, cleaned_paths):
         """Efficiently refresh UI after cleaning images"""
         try:
-            # Store current selection to restore later
+            # Store current selection and expansion state to restore later
             current_selection = []
+            expansion_state = {}  # group_index -> expanded (True/False)
+            
             if hasattr(self, 'tree') and self.tree:
                 current_selection = self.tree.selection()
                 selected_group_indices = []
+                
+                # Store expansion state of all group nodes
+                siblings = self.tree.get_children("")
+                for i, group_item in enumerate(siblings):
+                    expansion_state[i] = self.tree.item(group_item, 'open')
                 
                 # Map current selections to group indices
                 for selected_item in current_selection:
                     parent = self.tree.parent(selected_item)
                     if parent == "":  # This is a group node
                         # Find the group index by counting siblings
-                        siblings = self.tree.get_children("")
                         group_index = siblings.index(selected_item)
                         selected_group_indices.append(group_index)
                     else:
                         # This is an image node, get parent group index
-                        siblings = self.tree.get_children("")
                         group_index = siblings.index(parent)
                         selected_group_indices.append(group_index)
                 
@@ -1034,6 +1047,16 @@ class DuplicateImageIdentifierApp:
                             filename = os.path.basename(img_path)
                             self.tree.insert(group_item, "end", text=f"🖼️ {filename}", values=(img_path,))
                     
+                    # Restore expansion state for all groups
+                    for new_index, group_item in enumerate(new_group_nodes):
+                        # Find the corresponding old group index
+                        if new_index < len(group_mapping):
+                            old_group_index = group_mapping[new_index]
+                            # Restore the original expansion state
+                            if old_group_index in expansion_state:
+                                was_expanded = expansion_state[old_group_index]
+                                self.tree.item(group_item, open=was_expanded)
+                    
                     # Restore selection based on group mapping
                     items_to_select = []
                     for old_group_index in selected_group_indices:
@@ -1050,8 +1073,6 @@ class DuplicateImageIdentifierApp:
                     if items_to_select:
                         for item in items_to_select:
                             self.tree.selection_add(item)
-                            # Expand the group to show its contents
-                            self.tree.item(item, open=True)
                         
                         # Trigger the selection event to show images
                         self.on_tree_select(None)
