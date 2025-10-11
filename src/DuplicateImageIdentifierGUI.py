@@ -682,10 +682,20 @@ class DuplicateImageIdentifierApp:
                     img_container = tk.Frame(card, bg=self.colors['bg_card'])
                     img_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
                     
-                    # Image label
-                    lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
-                    lbl_img.image = img_tk
-                    lbl_img.pack()
+                    # Canvas for image with overlay support
+                    img_canvas = tk.Canvas(img_container, 
+                                         width=img_tk.width(), 
+                                         height=img_tk.height(),
+                                         bg=self.colors['bg_card'], 
+                                         highlightthickness=0, bd=0)
+                    img_canvas.pack()
+                    
+                    # Draw image on canvas
+                    img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
+                    img_canvas.image = img_tk  # Keep reference
+                    
+                    # Store canvas reference for overlay updates
+                    setattr(img_canvas, 'img_path', img_path)
                     
                     # Info section for checkbox and similarity score
                     info_frame = tk.Frame(img_container, bg=self.colors['bg_card'])
@@ -735,8 +745,8 @@ class DuplicateImageIdentifierApp:
                                            anchor="w")
                         sim_label.pack(fill=tk.X)
                     
-                    # Store checkbox reference
-                    self.selected_check_vars.append((var, img_path))
+                    # Store checkbox and canvas references
+                    self.selected_check_vars.append((var, img_path, img_canvas))
                     
                     # Hover effects
                     def on_enter(e, card=card):
@@ -745,7 +755,7 @@ class DuplicateImageIdentifierApp:
                     def on_leave(e, card=card):
                         card.configure(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
                     
-                    for widget in [card, lbl_img, chk]:
+                    for widget in [card, img_canvas, chk]:
                         widget.bind("<Enter>", on_enter)
                         widget.bind("<Leave>", on_leave)
                 
@@ -805,10 +815,20 @@ class DuplicateImageIdentifierApp:
                     img_container = tk.Frame(card, bg=self.colors['bg_card'])
                     img_container.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
                     
-                    # Image label
-                    lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
-                    lbl_img.image = img_tk
-                    lbl_img.pack()
+                    # Canvas for image with overlay support
+                    img_canvas = tk.Canvas(img_container, 
+                                         width=img_tk.width(), 
+                                         height=img_tk.height(),
+                                         bg=self.colors['bg_card'], 
+                                         highlightthickness=0, bd=0)
+                    img_canvas.pack()
+                    
+                    # Draw image on canvas
+                    img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
+                    img_canvas.image = img_tk  # Keep reference
+                    
+                    # Store canvas reference for overlay updates
+                    setattr(img_canvas, 'img_path', img_path)
                     
                     # Info section for checkbox and similarity score
                     info_frame = tk.Frame(img_container, bg=self.colors['bg_card'])
@@ -858,8 +878,8 @@ class DuplicateImageIdentifierApp:
                                            anchor="w")
                         sim_label.pack(fill=tk.X)
                     
-                    # Store checkbox reference for later use
-                    self.selected_check_vars.append((var, img_path))
+                    # Store checkbox and canvas references for later use
+                    self.selected_check_vars.append((var, img_path, img_canvas))
                     
                     # Hover effects
                     def on_enter(e, card=card):
@@ -868,7 +888,7 @@ class DuplicateImageIdentifierApp:
                     def on_leave(e, card=card):
                         card.configure(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
                     
-                    for widget in [card, lbl_img, chk]:
+                    for widget in [card, img_canvas, chk]:
                         widget.bind("<Enter>", on_enter)
                         widget.bind("<Leave>", on_leave)
                 
@@ -937,15 +957,28 @@ class DuplicateImageIdentifierApp:
         """Refresh the current image view after zoom change"""
         selected = self.tree.selection()
         if selected:
+            # Save current checkbox states before refresh
+            checkbox_states = {}
+            for item in self.selected_check_vars:
+                if len(item) >= 2:
+                    var, img_path = item[0], item[1]
+                    checkbox_states[img_path] = var.get()
+            
             # Clear current display
             for widget in self.img_panel.winfo_children():
                 widget.destroy()
+            
+            # Clear old canvas references
+            self.selected_check_vars.clear()
             
             # Redisplay with new thumbnail sizes
             if len(selected) > 1:
                 self.display_multiple_groups(selected)
             else:
                 self.display_single_selection(selected[0])
+            
+            # Restore checkbox states and apply cross overlays after UI update
+            self.root.after(50, lambda: self.restore_checkbox_states(checkbox_states))
                 
             # Update scroll region
             self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
@@ -977,7 +1010,9 @@ class DuplicateImageIdentifierApp:
         if self.selected_check_vars:
             # Use checkbox selections
             images_to_clean = []
-            for var, img_path in self.selected_check_vars:
+            for item in self.selected_check_vars:
+                if len(item) >= 2:
+                    var, img_path = item[0], item[1]
                 if var.get() and os.path.exists(img_path):
                     images_to_clean.append(img_path)
             
@@ -1124,14 +1159,19 @@ class DuplicateImageIdentifierApp:
         if getattr(self, '_updating_bulk_selection', False):
             return
             
+        # Update cross overlay on image
+        self.update_cross_overlay(var, img_path)
+            
         # Update clean button count based on selected images
-        selected_count = sum(1 for v, _ in self.selected_check_vars if v.get())
+        selected_count = sum(1 for item in self.selected_check_vars 
+                           if len(item) >= 2 and item[0].get())
         if hasattr(self, 'clean_btn_var'):
             self.clean_btn_var.set(f"Clean ({selected_count})")
     
     def count_selected_images(self):
         """Count how many images are currently selected via checkboxes"""
-        return sum(1 for var, _ in self.selected_check_vars if var.get())
+        return sum(1 for item in self.selected_check_vars 
+                  if len(item) >= 2 and item[0].get())
     
     def toggle_select_all_images(self):
         """Toggle selection of all visible images"""
@@ -1147,11 +1187,19 @@ class DuplicateImageIdentifierApp:
         
         try:
             # Apply to all checkboxes
-            for var, _ in self.selected_check_vars:
-                var.set(new_state)
+            for item in self.selected_check_vars:
+                if len(item) >= 2:
+                    var, img_path = item[0], item[1]
+                    var.set(new_state)
         finally:
             # Re-enable callback updates
             self._updating_bulk_selection = False
+        
+        # Update all cross overlays
+        for item in self.selected_check_vars:
+            if len(item) >= 2:
+                var, img_path = item[0], item[1]
+                self.update_cross_overlay(var, img_path)
         
         # Update clean button once at the end
         selected_count = self.count_selected_images()
@@ -1162,6 +1210,75 @@ class DuplicateImageIdentifierApp:
         """Refresh the duplicate detection after cleaning images"""
         messagebox.showinfo("Clean Complete", 
                           "Images moved to trash. Please select the folder again to refresh duplicate detection.")
+    
+    def restore_checkbox_states(self, checkbox_states):
+        """Restore checkbox states and cross overlays after refresh"""
+        # Temporarily disable bulk selection flag to allow individual updates
+        self._updating_bulk_selection = True
+        
+        try:
+            # Restore checkbox states
+            for item in self.selected_check_vars:
+                if len(item) >= 2:
+                    var, img_path = item[0], item[1]
+                    if img_path in checkbox_states:
+                        var.set(checkbox_states[img_path])
+        finally:
+            self._updating_bulk_selection = False
+        
+        # Apply cross overlays for checked items
+        for item in self.selected_check_vars:
+            if len(item) >= 2:
+                var, img_path = item[0], item[1]
+                if img_path in checkbox_states and checkbox_states[img_path]:
+                    self.update_cross_overlay(var, img_path)
+        
+        # Update clean button count
+        selected_count = self.count_selected_images()
+        if hasattr(self, 'clean_btn_var'):
+            self.clean_btn_var.set(f"Clean ({selected_count})")
+
+    def update_cross_overlay(self, var, img_path):
+        """Add or remove cross overlay on image based on checkbox state"""
+        # Find the canvas for this image path
+        canvas = None
+        for item in self.selected_check_vars:
+            if len(item) >= 3 and item[1] == img_path:
+                canvas = item[2]
+                break
+        
+        if not canvas:
+            return
+            
+        # Remove existing cross if any
+        canvas.delete("cross_overlay")
+        
+        # If checkbox is checked, draw cross overlay
+        if var.get():
+            # Try to get actual canvas dimensions
+            width = canvas.winfo_width()
+            height = canvas.winfo_height()
+            
+            # Fallback to configured size if not yet mapped
+            if width <= 1 or height <= 1:
+                width = canvas.winfo_reqwidth()
+                height = canvas.winfo_reqheight()
+                
+            # Final fallback to image size from canvas config
+            if width <= 1 or height <= 1:
+                width = canvas['width'] if 'width' in canvas.keys() else 100
+                height = canvas['height'] if 'height' in canvas.keys() else 100
+            
+            # Draw red cross lines
+            line_width = max(2, min(width, height) // 30)
+            
+            # Diagonal cross from top-left to bottom-right
+            canvas.create_line(0, 0, width, height, 
+                             fill="#ff0000", width=line_width, tags="cross_overlay")
+            
+            # Diagonal cross from top-right to bottom-left  
+            canvas.create_line(width, 0, 0, height,
+                             fill="#ff0000", width=line_width, tags="cross_overlay")
 
 if __name__ == "__main__":
     root = tk.Tk()
