@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "PhotoSift"
-version = "1.0.0"
+version = "1.1.0"
 description = "An AI-powered photo classification and organization tool"
 authors = [
     {name = "peterchei"}
@@ -13,14 +13,28 @@ requires-python = ">=3.8"
 dependencies = [
     "torch",
     "torchvision",
-    "Pillow",
+    "Pillow", 
     "numpy",
     "transformers",
+    "opencv-python",
+    "tqdm",
+    "requests", 
+    "packaging",
 ]
+
+[project.scripts]
+photosift = "launchPhotoSiftApp:main"
 
 [tool.pyinstaller]
 hiddenimports = [
     "PIL",
+    "PIL.Image", 
+    "PIL.ImageTk",
     "torch",
     "torchvision",
+    "cv2",
+    "opencv-python",
+    "transformers",
+    "numpy",
+    "concurrent.futures",
 ]

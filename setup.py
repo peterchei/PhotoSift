@@ -11,11 +11,15 @@ setup(
         "Pillow",
         "numpy",
         "transformers",
+        "opencv-python",
+        "tqdm",  # Used by transformers for progress bars
+        "requests",  # Used by transformers for downloading models
+        "packaging",  # Used by transformers for version handling
     ],
     python_requires=">=3.8",
     entry_points={
         "console_scripts": [
-            "photosift=ImageClassifierGUI:main",
+            "photosift=launchPhotoSiftApp:main",
         ],
     },
     author="peterchei",

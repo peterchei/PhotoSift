@@ -4,6 +4,7 @@ setup.py
 src/PhotoSift.egg-info/PKG-INFO
 src/PhotoSift.egg-info/SOURCES.txt
 src/PhotoSift.egg-info/dependency_links.txt
+src/PhotoSift.egg-info/entry_points.txt
 src/PhotoSift.egg-info/requires.txt
 src/PhotoSift.egg-info/top_level.txt
 tests/Test.py

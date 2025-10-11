@@ -3,3 +3,7 @@ torchvision
 Pillow
 numpy
 transformers
+opencv-python
+tqdm
+requests
+packaging
