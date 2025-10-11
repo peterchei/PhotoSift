@@ -5,6 +5,59 @@ from PIL import Image, ImageTk
 import os
 from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
 
+class ToolTip:
+    """
+    Create a tooltip for a given widget
+    """
+    def __init__(self, widget, text='widget info'):
+        self.waittime = 500     # milliseconds
+        self.wraplength = 180   # pixels
+        self.widget = widget
+        self.text = text
+        self.widget.bind("<Enter>", self.enter)
+        self.widget.bind("<Leave>", self.leave)
+        self.widget.bind("<ButtonPress>", self.leave)
+        self.id = None
+        self.tw = None
+
+    def enter(self, event=None):
+        self.schedule()
+
+    def leave(self, event=None):
+        self.unschedule()
+        self.hidetip()
+
+    def schedule(self):
+        self.unschedule()
+        self.id = self.widget.after(self.waittime, self.showtip)
+
+    def unschedule(self):
+        id = self.id
+        self.id = None
+        if id:
+            self.widget.after_cancel(id)
+
+    def showtip(self, event=None):
+        x = y = 0
+        x, y, cx, cy = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 20
+        # creates a toplevel window
+        self.tw = tk.Toplevel(self.widget)
+        # Leaves only the label and removes the app window
+        self.tw.wm_overrideredirect(True)
+        self.tw.wm_geometry("+%d+%d" % (x, y))
+        label = tk.Label(self.tw, text=self.text, justify='left',
+                         background="#ffffe0", relief='solid', borderwidth=1,
+                         wraplength=self.wraplength)
+        label.pack(ipadx=1)
+
+    def hidetip(self):
+        tw = self.tw
+        self.tw= None
+        if tw:
+            tw.destroy()
+
 class DuplicateImageIdentifierApp:
     def __init__(self, root):
         self.root = root
@@ -421,6 +474,30 @@ class DuplicateImageIdentifierApp:
                                   font=("Segoe UI", 11))
         self.status_bar.pack(fill=tk.BOTH, expand=True, padx=20)
 
+    def get_similarity_tooltip(self, similarity_score):
+        """Generate tooltip text for similarity scores"""
+        # Convert similarity score to percentage
+        percentage = similarity_score * 100
+        
+        # Determine similarity level and provide helpful guidance
+        if percentage >= 95:
+            level = "Perfect Match"
+            description = "Nearly identical images - likely exact duplicates or minimal differences"
+        elif percentage >= 85:
+            level = "Excellent Match"
+            description = "Very similar images - likely duplicates with minor variations (quality, size, etc.)"
+        elif percentage >= 75:
+            level = "Good Match"
+            description = "Similar images - may be duplicates or closely related photos"
+        elif percentage >= 65:
+            level = "Fair Match"
+            description = "Moderately similar images - review carefully to determine if duplicates"
+        else:
+            level = "Poor Match"
+            description = "Low similarity - may be false positives or very different images"
+        
+        return f"{level}\n{percentage:.1f}% Similarity\n\n{description}"
+
     def select_folder(self):
         folder = filedialog.askdirectory()
         if folder:
@@ -800,6 +877,10 @@ class DuplicateImageIdentifierApp:
                                fg=sim_color,
                                anchor="w")
             sim_label.pack(fill=tk.X)
+            
+            # Add tooltip for similarity score
+            tooltip_text = self.get_similarity_tooltip(similarity)
+            ToolTip(sim_label, tooltip_text)
         
         # Store checkbox and canvas references
         self.selected_check_vars.append((var, img_path, img_canvas))
