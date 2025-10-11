@@ -3,6 +3,7 @@ from tkinter import filedialog, messagebox
 import tkinter.ttk as ttk
 from PIL import Image, ImageTk
 import os
+import time
 from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
                      StatusBar, ZoomControls, ModernButton, ImageUtils)
@@ -23,6 +24,7 @@ class DuplicateImageIdentifierApp:
         self.selected_check_vars = []  # List of (checkbox_var, image_path, img_canvas) tuples
         self.similarity_scores = {}  # path -> similarity score for duplicates
         self._updating_bulk_selection = False  # Flag to prevent callback loops during bulk operations
+        self._cleaning_in_progress = False  # Flag to prevent UI updates during cleaning
         
         # Thumbnail size configuration for zoom functionality
         self.thumb_size = (180, 135)  # Default size for single group view
@@ -758,135 +760,149 @@ class DuplicateImageIdentifierApp:
     
     def clean_selected_images(self):
         """Move selected duplicate images to trash"""
-        # Check if we have checkbox selections
-        if self.selected_check_vars:
-            # Use checkbox selections
-            images_to_clean = []
-            for item in self.selected_check_vars:
-                if len(item) >= 2:
-                    var, img_path = item[0], item[1]
-                if var.get() and os.path.exists(img_path):
-                    images_to_clean.append(img_path)
+        # Prevent concurrent cleaning operations
+        if self._cleaning_in_progress:
+            return
             
-            if not images_to_clean:
-                messagebox.showinfo("No Selection", "Please select images using checkboxes to clean.")
-                return
-            
-            # Confirm cleaning action
-            result = messagebox.askyesno(
-                "Confirm Clean", 
-                f"Move {len(images_to_clean)} selected images to trash?\n\nThis action cannot be undone.",
-                icon='warning'
-            )
-            
-            if result:
-                self.move_images_to_trash(images_to_clean)
-                # Refresh the display
-                self.refresh_after_clean()
-        else:
-            # Fallback to tree selection method
-            selected_items = self.tree.selection() if self.tree else []
-            if not selected_items:
-                messagebox.showinfo("No Selection", "Please select duplicate groups to clean.")
-                return
-            
-            # Count images to be cleaned from selected groups
-            images_to_clean = []
-            groups_processed = 0
-            
-            for item in selected_items:
-                # Get children (individual images) of selected group
-                children = self.tree.get_children(item)
-                if len(children) > 1:  # Only clean if there are duplicates
-                    groups_processed += 1
-                    # Keep the first image, clean the rest
-                    for i, child in enumerate(children[1:], 1):
-                        child_item = self.tree.item(child)
-                        if 'values' in child_item and child_item['values']:
-                            img_path = child_item['values'][0]
-                            if img_path and os.path.exists(img_path):
-                                images_to_clean.append(img_path)
-            
-            if not images_to_clean:
-                messagebox.showinfo("Nothing to Clean", "No duplicate images found in selection.")
-                return
-            
-            # Confirm cleaning action
-            result = messagebox.askyesno(
-                "Confirm Clean", 
-                f"Move {len(images_to_clean)} duplicate images from {groups_processed} groups to trash?\n\nThis action cannot be undone.",
-                icon='warning'
-            )
-            
-            if result:
-                self.move_images_to_trash(images_to_clean)
-                # Refresh the display
-                self.refresh_after_clean()
+        # Set cleaning flag
+        self._cleaning_in_progress = True
+        
+        try:
+            # Check if we have checkbox selections
+            if self.selected_check_vars:
+                # Use checkbox selections
+                images_to_clean = []
+                for item in self.selected_check_vars:
+                    if len(item) >= 2:
+                        var, img_path = item[0], item[1]
+                    if var.get() and os.path.exists(img_path):
+                        images_to_clean.append(img_path)
+                
+                if not images_to_clean:
+                    messagebox.showinfo("No Selection", "Please select images using checkboxes to clean.")
+                    return
+                
+                # Confirm cleaning action
+                result = messagebox.askyesno(
+                    "Confirm Clean", 
+                    f"Move {len(images_to_clean)} selected images to trash?\n\nThis action cannot be undone.",
+                    icon='warning'
+                )
+                
+                if result:
+                    self.move_images_to_trash(images_to_clean)
+                    # Refresh the display
+                    self.refresh_after_clean(images_to_clean)
+            else:
+                # Fallback to tree selection method
+                selected_items = self.tree.selection() if self.tree else []
+                if not selected_items:
+                    messagebox.showinfo("No Selection", "Please select duplicate groups to clean.")
+                    return
+                
+                # Count images to be cleaned from selected groups
+                images_to_clean = []
+                groups_processed = 0
+                
+                for item in selected_items:
+                    # Get children (individual images) of selected group
+                    children = self.tree.get_children(item)
+                    if len(children) > 1:  # Only clean if there are duplicates
+                        groups_processed += 1
+                        # Keep the first image, clean the rest
+                        for i, child in enumerate(children[1:], 1):
+                            child_item = self.tree.item(child)
+                            if 'values' in child_item and child_item['values']:
+                                img_path = child_item['values'][0]
+                                if img_path and os.path.exists(img_path):
+                                    images_to_clean.append(img_path)
+                
+                if not images_to_clean:
+                    messagebox.showinfo("Nothing to Clean", "No duplicate images found in selection.")
+                    return
+                
+                # Confirm cleaning action
+                result = messagebox.askyesno(
+                    "Confirm Clean", 
+                    f"Move {len(images_to_clean)} duplicate images from {groups_processed} groups to trash?\n\nThis action cannot be undone.",
+                    icon='warning'
+                )
+                
+                if result:
+                    self.move_images_to_trash(images_to_clean)
+                    # Refresh the display
+                    self.refresh_after_clean(images_to_clean)
+                    
+        finally:
+            # Reset cleaning flag
+            self._cleaning_in_progress = False
     
     def move_images_to_trash(self, image_paths):
-        """Move images to system trash"""
+        """Move images to system trash or create local trash folder"""
+        # Create Trash directory if it doesn't exist
+        if not self.folder:
+            messagebox.showerror("Error", "No folder selected.")
+            return
+
+        trash_dir = os.path.join(self.folder, "Trash")
         try:
-            import send2trash
-            moved_count = 0
-            
-            for img_path in image_paths:
-                try:
-                    if os.path.exists(img_path):
-                        send2trash.send2trash(img_path)
-                        moved_count += 1
-                except Exception as e:
-                    print(f"Error moving {img_path} to trash: {e}")
-            
-            messagebox.showinfo("Clean Complete", f"Successfully moved {moved_count} images to trash.")
-            
-        except ImportError:
-            # Fallback - create a PhotoSift trash folder
-            self.create_photosift_trash(image_paths)
-    
-    def create_photosift_trash(self, image_paths):
-        """Create PhotoSift trash folder and move images there"""
-        try:
-            # Create trash folder in PhotoSift directory
-            trash_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "PhotoSift_Trash")
             os.makedirs(trash_dir, exist_ok=True)
-            
-            moved_count = 0
-            for img_path in image_paths:
-                try:
-                    if os.path.exists(img_path):
-                        filename = os.path.basename(img_path)
-                        trash_path = os.path.join(trash_dir, filename)
-                        
-                        # Handle duplicate names in trash
-                        counter = 1
-                        base_name, ext = os.path.splitext(filename)
-                        while os.path.exists(trash_path):
-                            new_name = f"{base_name}_{counter}{ext}"
-                            trash_path = os.path.join(trash_dir, new_name)
-                            counter += 1
-                        
-                        import shutil
-                        shutil.move(img_path, trash_path)
-                        moved_count += 1
-                except Exception as e:
-                    print(f"Error moving {img_path} to PhotoSift trash: {e}")
-            
-            messagebox.showinfo("Clean Complete", 
-                              f"Successfully moved {moved_count} images to PhotoSift_Trash folder.\n"
-                              f"Location: {trash_dir}")
-            
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to create trash folder: {e}")
-    
+            messagebox.showerror("Error", f"Failed to create Trash directory:\n{str(e)}")
+            return
+
+        # Move files to trash
+        moved_count = 0
+        failed_files = []
+        
+        for img_path in image_paths:
+            try:
+                # Generate unique filename in case of duplicates
+                base_name = os.path.basename(img_path)
+                name, ext = os.path.splitext(base_name)
+                target_path = os.path.join(trash_dir, base_name)
+                counter = 1
+                
+                while os.path.exists(target_path):
+                    target_path = os.path.join(trash_dir, f"{name}_{counter}{ext}")
+                    counter += 1
+                
+                # Move the file
+                import shutil
+                shutil.move(img_path, target_path)
+                moved_count += 1
+                
+                # Remove from data structures
+                self.remove_from_groups(img_path)
+                    
+            except Exception as e:
+                print(f"Failed to move {img_path}: {str(e)}")
+                failed_files.append(base_name)
+
+        # Store results for refresh_after_clean
+        self._last_clean_count = moved_count
+        self._last_failed_files = failed_files
+        self._trash_dir = trash_dir
+
+    def remove_from_groups(self, img_path):
+        """Remove an image path from all groups"""
+        for group in self.groups:
+            if img_path in group:
+                group.remove(img_path)
+
     def open_trash_folder(self):
-        """Open the PhotoSift trash folder"""
-        trash_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "PhotoSift_Trash")
+        """Open the local Trash folder in the selected directory"""
+        if not self.folder:
+            messagebox.showinfo("No Folder", "Please select a folder first to locate the Trash directory.")
+            return
+            
+        trash_dir = os.path.join(self.folder, "Trash")
         
         if os.path.exists(trash_dir):
             # Open folder in Windows Explorer
             os.startfile(trash_dir)
         else:
-            messagebox.showinfo("Trash Empty", "No PhotoSift trash folder found. No items have been cleaned yet.")
+            messagebox.showinfo("Trash Empty", f"No Trash folder found at:\n{trash_dir}\n\nNo items have been cleaned yet.")
     
     def update_clean_button_count(self):
         """Update the clean button with the count of selected items"""
@@ -958,11 +974,223 @@ class DuplicateImageIdentifierApp:
         if hasattr(self, 'clean_btn_var'):
             self.clean_btn_var.set(f"Clean ({selected_count})")
     
-    def refresh_after_clean(self):
-        """Refresh the duplicate detection after cleaning images"""
-        messagebox.showinfo("Clean Complete", 
-                          "Images moved to trash. Please select the folder again to refresh duplicate detection.")
-    
+    def refresh_after_clean(self, cleaned_paths):
+        """Efficiently refresh UI after cleaning images"""
+        try:
+            # Store current selection to restore later
+            current_selection = []
+            if hasattr(self, 'tree') and self.tree:
+                current_selection = self.tree.selection()
+                selected_group_indices = []
+                
+                # Map current selections to group indices
+                for selected_item in current_selection:
+                    parent = self.tree.parent(selected_item)
+                    if parent == "":  # This is a group node
+                        # Find the group index by counting siblings
+                        siblings = self.tree.get_children("")
+                        group_index = siblings.index(selected_item)
+                        selected_group_indices.append(group_index)
+                    else:
+                        # This is an image node, get parent group index
+                        siblings = self.tree.get_children("")
+                        group_index = siblings.index(parent)
+                        selected_group_indices.append(group_index)
+                
+            # Remove cleaned images from groups and update tree
+            if hasattr(self, 'groups') and self.groups:
+                # Remove cleaned images from groups
+                updated_groups = []
+                group_mapping = []  # Track which old groups correspond to new groups
+                
+                for old_index, group in enumerate(self.groups):
+                    # Filter out cleaned images
+                    remaining_images = [img for img in group if img not in cleaned_paths and os.path.exists(img)]
+                    # Only keep groups that still have duplicates (2+ images)
+                    if len(remaining_images) >= 2:
+                        updated_groups.append(remaining_images)
+                        group_mapping.append(old_index)  # Map new index to old index
+                
+                # Update groups and rebuild tree with proper naming
+                self.groups = updated_groups
+                
+                # Clear and rebuild tree
+                if self.tree:
+                    for item in self.tree.get_children():
+                        self.tree.delete(item)
+                    
+                    # Rebuild tree with original naming scheme
+                    new_group_nodes = []
+                    for i, group in enumerate(self.groups):
+                        # Use original naming scheme: first filename with duplicate count
+                        first_filename = os.path.basename(group[0])
+                        duplicate_count = len(group) - 1
+                        group_text = f"📂 {first_filename} ({duplicate_count} duplicate{'s' if duplicate_count != 1 else ''})"
+                        
+                        group_item = self.tree.insert("", "end", text=group_text, open=False)
+                        new_group_nodes.append(group_item)
+                        
+                        for img_path in group:
+                            filename = os.path.basename(img_path)
+                            self.tree.insert(group_item, "end", text=f"🖼️ {filename}", values=(img_path,))
+                    
+                    # Restore selection based on group mapping
+                    items_to_select = []
+                    for old_group_index in selected_group_indices:
+                        # Find if this old group still exists
+                        try:
+                            new_index = group_mapping.index(old_group_index)
+                            if new_index < len(new_group_nodes):
+                                items_to_select.append(new_group_nodes[new_index])
+                        except ValueError:
+                            # Old group was completely cleaned, skip
+                            pass
+                    
+                    # If we have items to select, select them and trigger display
+                    if items_to_select:
+                        for item in items_to_select:
+                            self.tree.selection_add(item)
+                            # Expand the group to show its contents
+                            self.tree.item(item, open=True)
+                        
+                        # Trigger the selection event to show images
+                        self.on_tree_select(None)
+                    else:
+                        # No valid selection, clear image display
+                        for widget in self.img_panel.winfo_children():
+                            widget.destroy()
+                        self.selected_check_vars.clear()
+                    
+                    # Update scroll region
+                    self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all"))
+                    
+                    # Update clean button count
+                    self.update_clean_button_count()
+                    
+                    # Update status
+                    if hasattr(self, 'status_bar'):
+                        self.status_bar.set_text(f"Cleaned images. {len(self.groups)} duplicate groups remaining.")
+
+            # Show modern completion popup
+            self.show_clean_completion_popup()
+            
+        except Exception as e:
+            print(f"Error during refresh: {e}")
+            # Fallback to simple message
+            messagebox.showinfo("Clean Complete", "Images moved to trash. Please refresh manually if needed.")
+
+    def show_clean_completion_popup(self):
+        """Show professional popup message for clean completion"""
+        try:
+            popup = tk.Toplevel()
+            popup.title("Operation Status")
+            
+            # Make the window float on top
+            popup.lift()
+            popup.attributes('-topmost', True)
+            
+            # Enhanced window setup
+            window_width = 380
+            window_height = 150
+            
+            # Get the position of the main window
+            main_window_x = self.root.winfo_x()
+            main_window_y = self.root.winfo_y()
+            main_window_width = self.root.winfo_width()
+            main_window_height = self.root.winfo_height()
+            
+            # Calculate position (centered on main window)
+            position_x = main_window_x + (main_window_width - window_width) // 2
+            position_y = main_window_y + (main_window_height - window_height) // 2
+            
+            # Set window geometry
+            popup.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
+            
+            # Configure window style
+            popup.configure(bg='#ffffff')
+            popup.overrideredirect(True)  # Remove window decorations
+            
+            # Create main container with border
+            border_frame = tk.Frame(popup, bg='#e2e8f0', padx=1, pady=1)
+            border_frame.pack(fill=tk.BOTH, expand=True)
+            
+            main_frame = tk.Frame(border_frame, bg='#ffffff')
+            main_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Header bar
+            header_frame = tk.Frame(main_frame, bg='#f8fafc', height=32)
+            header_frame.pack(fill=tk.X)
+            header_frame.pack_propagate(False)
+            
+            header_label = tk.Label(header_frame, text="Operation Complete",
+                                  bg='#f8fafc', fg='#334155',
+                                  font=("Segoe UI", 11, "bold"))
+            header_label.pack(side=tk.LEFT, padx=15, pady=6)
+            
+            # Content frame with padding
+            content_frame = tk.Frame(main_frame, bg='#ffffff', padx=20, pady=15)
+            content_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Get clean results
+            moved_count = getattr(self, '_last_clean_count', 0)
+            failed_files = getattr(self, '_last_failed_files', [])
+            trash_dir = getattr(self, '_trash_dir', '')
+            
+            # Status icon and colors
+            if failed_files:
+                icon = "⚠"
+                title = "Partial Success"
+                icon_color = "#dc2626"  # Red
+                message = f"Moved {moved_count} images to Trash\n"
+                if len(failed_files) > 0:
+                    message += f"Failed to move {len(failed_files)} files"
+            else:
+                icon = "✓"
+                title = "Success"
+                icon_color = "#0369a1"  # Blue
+                message = f"Successfully moved {moved_count} images to Trash"
+                if trash_dir:
+                    message += f"\nLocation: {trash_dir}"
+            
+            # Icon
+            icon_label = tk.Label(content_frame, text=icon, bg='#ffffff',
+                                fg=icon_color, font=("Segoe UI", 24))
+            icon_label.pack(pady=(0, 5))
+            
+            # Title
+            title_label = tk.Label(content_frame, text=title, bg='#ffffff',
+                                 fg=icon_color, font=("Segoe UI", 12, "bold"))
+            title_label.pack(pady=(0, 8))
+            
+            # Message
+            msg_label = tk.Label(content_frame, text=message, bg='#ffffff',
+                               fg='#475569', font=("Segoe UI", 11))
+            msg_label.pack()
+            
+            # Force the window to update and show
+            popup.update()
+            
+            # Add subtle fade out before destruction
+            def fade_out():
+                try:
+                    for i in range(10):
+                        opacity = 1.0 - (i / 10)
+                        popup.attributes('-alpha', opacity)
+                        popup.update()
+                        popup.after(50)
+                    popup.destroy()
+                except:
+                    pass  # Ignore errors during fade out
+            
+            # Schedule fade out and destruction
+            popup.after(1500, fade_out)
+            
+        except Exception as e:
+            print(f"Error showing popup: {str(e)}")
+            # Fallback to simple message
+            moved_count = getattr(self, '_last_clean_count', 0)
+            messagebox.showinfo("Clean Complete", f"Successfully moved {moved_count} images to Trash")
+
     def restore_checkbox_states(self, checkbox_states):
         """Restore checkbox states and cross overlays after refresh"""
         # Temporarily disable bulk selection flag to allow individual updates
