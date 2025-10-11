@@ -605,11 +605,8 @@ class DuplicateImageIdentifierApp:
             widget.destroy()
         self.selected_check_vars.clear()  # Clear checkbox tracking
         
-        # Handle multiple selection
-        if len(selected) > 1:
-            self.display_multiple_groups(selected)
-        else:
-            self.display_single_selection(selected[0])
+        # Handle both single and multiple selection with unified method
+        self.display_groups(selected)
         
         # Update clean button count
         self.update_clean_button_count()
@@ -617,10 +614,14 @@ class DuplicateImageIdentifierApp:
         # Update scroll region
         self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
     
-    def display_multiple_groups(self, selected_items):
-        """Display images from multiple selected groups, each group in its own row"""
+    def display_groups(self, selected_items):
+        """Unified method to display images from single or multiple selected groups"""
         total_images = 0
         current_row = 0
+        is_single_group = len(selected_items) == 1
+        
+        # Choose appropriate thumbnail size and layout
+        thumb_size = self.thumb_size if is_single_group else self.multi_thumb_size
         
         for item_id in selected_items:
             item = self.tree.item(item_id)
@@ -632,19 +633,23 @@ class DuplicateImageIdentifierApp:
             # Get group name
             group_name = item['text']
             
-            # Create group header
-            group_header = tk.Frame(self.img_panel, bg=self.colors['bg_secondary'], height=40)
-            group_header.grid(row=current_row, column=0, columnspan=10, sticky='ew', padx=5, pady=(5, 0))
-            group_header.grid_propagate(False)
+            # Create group header (only for multiple groups or single group with multiple images)
+            children = self.tree.get_children(item_id)
+            show_header = not is_single_group or len(children) > 1
             
-            header_label = tk.Label(group_header, 
-                                   text=f"📂 {group_name}", 
-                                   font=("Segoe UI", 12, "bold"),
-                                   bg=self.colors['bg_secondary'],
-                                   fg=self.colors['text_primary'])
-            header_label.pack(side=tk.LEFT, padx=10, pady=8)
-            
-            current_row += 1
+            if show_header:
+                group_header = tk.Frame(self.img_panel, bg=self.colors['bg_secondary'], height=40)
+                group_header.grid(row=current_row, column=0, columnspan=10, sticky='ew', padx=5, pady=(5, 0))
+                group_header.grid_propagate(False)
+                
+                header_label = tk.Label(group_header, 
+                                       text=f"📂 {group_name}", 
+                                       font=("Segoe UI", 12, "bold"),
+                                       bg=self.colors['bg_secondary'],
+                                       fg=self.colors['text_primary'])
+                header_label.pack(side=tk.LEFT, padx=10, pady=8)
+                
+                current_row += 1
             
             # Get images for this group
             children = self.tree.get_children(item_id)
@@ -656,267 +661,160 @@ class DuplicateImageIdentifierApp:
                     img_path = child_item['values'][0]
                     try:
                         img = Image.open(img_path)
-                        img.thumbnail(self.multi_thumb_size, Image.Resampling.LANCZOS)
+                        img.thumbnail(thumb_size, Image.Resampling.LANCZOS)
                         img_tk = ImageTk.PhotoImage(img)
                         group_images.append((img_tk, img_path))
                     except Exception as e:
                         print(f"Error loading image {img_path}: {e}")
                         continue
             
-            # Display images in a single row for this group
+            # Display images with appropriate layout
             if group_images:
-                images_frame = tk.Frame(self.img_panel, bg=self.colors['bg_primary'])
-                images_frame.grid(row=current_row, column=0, columnspan=10, sticky='ew', padx=5, pady=(0, 10))
-                
-                for col, (img_tk, img_path) in enumerate(group_images):
-                    # Create image card
-                    card = tk.Frame(images_frame, 
-                                   bg=self.colors['bg_card'], 
-                                   bd=0,
-                                   highlightbackground=self.colors['bg_secondary'],
-                                   highlightthickness=1,
-                                   relief=tk.SOLID)
-                    card.grid(row=0, column=col, padx=5, pady=5, sticky='nsew')
-                    
-                    # Image container
-                    img_container = tk.Frame(card, bg=self.colors['bg_card'])
-                    img_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-                    
-                    # Canvas for image with overlay support
-                    img_canvas = tk.Canvas(img_container, 
-                                         width=img_tk.width(), 
-                                         height=img_tk.height(),
-                                         bg=self.colors['bg_card'], 
-                                         highlightthickness=0, bd=0)
-                    img_canvas.pack()
-                    
-                    # Draw image on canvas
-                    img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
-                    img_canvas.image = img_tk  # Keep reference
-                    
-                    # Store canvas reference for overlay updates
-                    setattr(img_canvas, 'img_path', img_path)
-                    
-                    # Info section for checkbox and similarity score
-                    info_frame = tk.Frame(img_container, bg=self.colors['bg_card'])
-                    info_frame.pack(fill=tk.X, pady=(3, 0))
-                    
-                    # Checkbox and filename
-                    var = tk.BooleanVar()
-                    filename = os.path.basename(img_path)
-                    if len(filename) > 12:
-                        display_filename = filename[:9] + "..."
-                    else:
-                        display_filename = filename
-                    
-                    chk = tk.Checkbutton(info_frame,
-                                       text=display_filename,
-                                       variable=var,
-                                       command=lambda v=var, p=img_path: self.on_image_check(v, p),
-                                       font=("Segoe UI", 8, "bold"),
-                                       bg=self.colors['bg_card'],
-                                       fg=self.colors['text_primary'],
-                                       activebackground=self.colors['bg_card'],
-                                       selectcolor=self.colors['accent'],
-                                       bd=0, highlightthickness=0,
-                                       anchor="w")
-                    chk.pack(fill=tk.X, pady=(0, 1))
-                    
-                    # Similarity score with color coding
-                    if img_path in self.similarity_scores:
-                        similarity = self.similarity_scores[img_path]
-                        sim_text = f"{similarity:.0%}"  # Shorter format for multi-view
-                        
-                        # Color code based on similarity
-                        if similarity >= 0.98:
-                            sim_color = self.colors['success']
-                        elif similarity >= 0.96:
-                            sim_color = self.colors['accent']
-                        elif similarity >= 0.95:
-                            sim_color = self.colors['warning']
-                        else:
-                            sim_color = self.colors['danger']
-                        
-                        sim_label = tk.Label(info_frame,
-                                           text=sim_text,
-                                           font=("Segoe UI", 7),
-                                           bg=self.colors['bg_card'],
-                                           fg=sim_color,
-                                           anchor="w")
-                        sim_label.pack(fill=tk.X)
-                    
-                    # Store checkbox and canvas references
-                    self.selected_check_vars.append((var, img_path, img_canvas))
-                    
-                    # Hover effects
-                    def on_enter(e, card=card):
-                        card.configure(highlightbackground=self.colors['accent'], highlightthickness=2)
-                    
-                    def on_leave(e, card=card):
-                        card.configure(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
-                    
-                    for widget in [card, img_canvas, chk]:
-                        widget.bind("<Enter>", on_enter)
-                        widget.bind("<Leave>", on_leave)
+                if is_single_group:
+                    # Grid layout for single group (better space utilization)
+                    self.display_images_in_grid(group_images, current_row)
+                else:
+                    # Row layout for multiple groups
+                    self.display_images_in_row(group_images, current_row)
+
                 
                 total_images += len(group_images)
                 current_row += 1
         
         # Update result label and status
-        self.lbl_result.config(text=f"Viewing {len(selected_items)} duplicate groups - {total_images} total images", 
-                             fg=self.colors['text_primary'])
-        self.status_var.set(f"Viewing {len(selected_items)} duplicate groups with {total_images} images")
+        if is_single_group:
+            self.lbl_result.config(text=f"Viewing group - {total_images} images", 
+                                 fg=self.colors['text_primary'])
+            self.status_var.set(f"Viewing duplicate group with {total_images} images")
+        else:
+            self.lbl_result.config(text=f"Viewing {len(selected_items)} groups - {total_images} total images", 
+                                 fg=self.colors['text_primary'])
+            self.status_var.set(f"Viewing {len(selected_items)} groups with {total_images} images")
     
-    def display_single_selection(self, item_id):
-        """Display images from a single selected group or single image"""
-        item = self.tree.item(item_id)
+    def display_images_in_grid(self, group_images, start_row):
+        """Display images in a grid layout (for single group selection)"""
+        canvas_width = self.img_canvas.winfo_width() or 800
+        cols = max(1, (canvas_width - 40) // 200)
         
-        # If group node (no 'values'), show all images in group
-        if not ('values' in item and item['values']):
-            if "No duplicates found" in item['text'] or "Select a folder" in item['text']:
-                return
-                
-            # Find group images
-            children = self.tree.get_children(item_id)
-            images = []
+        for idx, (img_tk, img_path) in enumerate(group_images):
+            row = start_row + (idx // cols)
+            col = idx % cols
             
-            for child in children:
-                child_item = self.tree.item(child)
-                if 'values' in child_item and child_item['values']:
-                    img_path = child_item['values'][0]
-                    try:
-                        img = Image.open(img_path)
-                        img.thumbnail(self.thumb_size, Image.Resampling.LANCZOS)
-                        img_tk = ImageTk.PhotoImage(img)
-                        images.append((img_tk, img_path))
-                    except Exception as e:
-                        print(f"Error loading image {img_path}: {e}")
-                        continue
-            
-            # Display thumbnails in grid layout
-            if images:
-                canvas_width = self.img_canvas.winfo_width() or 800
-                cols = max(1, (canvas_width - 40) // 200)
-                
-                for idx, (img_tk, img_path) in enumerate(images):
-                    row = idx // cols
-                    col = idx % cols
-                    
-                    # Modern card frame
-                    card = tk.Frame(self.img_panel, 
-                                   bg=self.colors['bg_card'], 
-                                   bd=0,
-                                   highlightbackground=self.colors['bg_secondary'],
-                                   highlightthickness=1,
-                                   relief=tk.SOLID)
-                    card.grid(row=row, column=col, padx=10, pady=10, sticky='nsew')
-                    
-                    # Image container with padding
-                    img_container = tk.Frame(card, bg=self.colors['bg_card'])
-                    img_container.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
-                    
-                    # Canvas for image with overlay support
-                    img_canvas = tk.Canvas(img_container, 
-                                         width=img_tk.width(), 
-                                         height=img_tk.height(),
-                                         bg=self.colors['bg_card'], 
-                                         highlightthickness=0, bd=0)
-                    img_canvas.pack()
-                    
-                    # Draw image on canvas
-                    img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
-                    img_canvas.image = img_tk  # Keep reference
-                    
-                    # Store canvas reference for overlay updates
-                    setattr(img_canvas, 'img_path', img_path)
-                    
-                    # Info section for checkbox and similarity score
-                    info_frame = tk.Frame(img_container, bg=self.colors['bg_card'])
-                    info_frame.pack(fill=tk.X, pady=(5, 0))
-                    
-                    # Checkbox and filename
-                    var = tk.BooleanVar()
-                    filename = os.path.basename(img_path)
-                    if len(filename) > 18:
-                        display_filename = filename[:15] + "..."
-                    else:
-                        display_filename = filename
-                    
-                    chk = tk.Checkbutton(info_frame,
-                                       text=display_filename,
-                                       variable=var,
-                                       command=lambda v=var, p=img_path: self.on_image_check(v, p),
-                                       font=("Segoe UI", 9, "bold"),
-                                       bg=self.colors['bg_card'],
-                                       fg=self.colors['text_primary'],
-                                       activebackground=self.colors['bg_card'],
-                                       selectcolor=self.colors['accent'],
-                                       bd=0, highlightthickness=0,
-                                       anchor="w")
-                    chk.pack(fill=tk.X, pady=(0, 2))
-                    
-                    # Similarity score with color coding
-                    if img_path in self.similarity_scores:
-                        similarity = self.similarity_scores[img_path]
-                        sim_text = f"Similarity: {similarity:.0%}"
-                        
-                        # Color code based on similarity
-                        if similarity >= 0.98:
-                            sim_color = self.colors['success']  # High similarity - green
-                        elif similarity >= 0.96:
-                            sim_color = self.colors['accent']   # Medium-high - blue
-                        elif similarity >= 0.95:
-                            sim_color = self.colors['warning']  # Medium - orange
-                        else:
-                            sim_color = self.colors['danger']   # Lower - red
-                        
-                        sim_label = tk.Label(info_frame,
-                                           text=sim_text,
-                                           font=("Segoe UI", 8),
-                                           bg=self.colors['bg_card'],
-                                           fg=sim_color,
-                                           anchor="w")
-                        sim_label.pack(fill=tk.X)
-                    
-                    # Store checkbox and canvas references for later use
-                    self.selected_check_vars.append((var, img_path, img_canvas))
-                    
-                    # Hover effects
-                    def on_enter(e, card=card):
-                        card.configure(highlightbackground=self.colors['accent'], highlightthickness=2)
-                    
-                    def on_leave(e, card=card):
-                        card.configure(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
-                    
-                    for widget in [card, img_canvas, chk]:
-                        widget.bind("<Enter>", on_enter)
-                        widget.bind("<Leave>", on_leave)
-                
-                self.lbl_result.config(text=f"Group: {item['text']} - {len(images)} images", 
-                                     fg=self.colors['text_primary'])
-                self.status_var.set(f"Viewing duplicate group with {len(images)} similar images")
-                
-        # If leaf node, show single image enlarged
-        elif 'values' in item and item['values']:
-            path = item['values'][0]
-            try:
-                img = Image.open(path)
-                img.thumbnail((600, 450), Image.Resampling.LANCZOS)
-                img_tk = ImageTk.PhotoImage(img)
-                
-                # Center the single image
-                single_frame = tk.Frame(self.img_panel, bg=self.colors['bg_primary'])
-                single_frame.pack(expand=True, fill=tk.BOTH)
-                
-                lbl = tk.Label(single_frame, image=img_tk, bg=self.colors['bg_primary'])
-                lbl.image = img_tk
-                lbl.pack(expand=True)
-                
-                self.lbl_result.config(text=os.path.basename(path), fg=self.colors['text_primary'])
-                self.status_var.set(f"Viewing: {os.path.basename(path)}")
-            except Exception as e:
-                self.lbl_result.config(text=f"Error loading image: {e}", fg=self.colors['danger'])
+            self.create_image_card(img_tk, img_path, row, col, is_grid=True)
     
+    def display_images_in_row(self, group_images, row):
+        """Display images in a single row layout (for multiple group selection)"""
+        images_frame = tk.Frame(self.img_panel, bg=self.colors['bg_primary'])
+        images_frame.grid(row=row, column=0, columnspan=10, sticky='ew', padx=5, pady=(0, 10))
+        
+        for col, (img_tk, img_path) in enumerate(group_images):
+            self.create_image_card(img_tk, img_path, 0, col, parent=images_frame, is_grid=False)
+    
+    def create_image_card(self, img_tk, img_path, row, col, parent=None, is_grid=True):
+        """Create a unified image card with canvas, checkbox, and similarity score"""
+        if parent is None:
+            parent = self.img_panel
+            
+        # Create image card
+        card = tk.Frame(parent, 
+                       bg=self.colors['bg_card'], 
+                       bd=0,
+                       highlightbackground=self.colors['bg_secondary'],
+                       highlightthickness=1,
+                       relief=tk.SOLID)
+        
+        if is_grid:
+            card.grid(row=row, column=col, padx=10, pady=10, sticky='nsew')
+        else:
+            card.grid(row=row, column=col, padx=5, pady=5, sticky='nsew')
+        
+        # Image container
+        padding = 8 if is_grid else 5
+        img_container = tk.Frame(card, bg=self.colors['bg_card'])
+        img_container.pack(fill=tk.BOTH, expand=True, padx=padding, pady=padding)
+        
+        # Canvas for image with overlay support
+        img_canvas = tk.Canvas(img_container, 
+                             width=img_tk.width(), 
+                             height=img_tk.height(),
+                             bg=self.colors['bg_card'], 
+                             highlightthickness=0, bd=0)
+        img_canvas.pack()
+        
+        # Draw image on canvas
+        img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
+        img_canvas.image = img_tk  # Keep reference
+        
+        # Store canvas reference for overlay updates
+        setattr(img_canvas, 'img_path', img_path)
+        
+        # Info section for checkbox and similarity score
+        info_frame = tk.Frame(img_container, bg=self.colors['bg_card'])
+        info_frame.pack(fill=tk.X, pady=(5 if is_grid else 3, 0))
+        
+        # Checkbox and filename
+        var = tk.BooleanVar()
+        filename = os.path.basename(img_path)
+        max_length = 18 if is_grid else 12
+        truncate_length = 15 if is_grid else 9
+        
+        if len(filename) > max_length:
+            display_filename = filename[:truncate_length] + "..."
+        else:
+            display_filename = filename
+        
+        font_size = 9 if is_grid else 8
+        chk = tk.Checkbutton(info_frame,
+                           text=display_filename,
+                           variable=var,
+                           command=lambda v=var, p=img_path: self.on_image_check(v, p),
+                           font=("Segoe UI", font_size, "bold"),
+                           bg=self.colors['bg_card'],
+                           fg=self.colors['text_primary'],
+                           activebackground=self.colors['bg_card'],
+                           selectcolor=self.colors['accent'],
+                           bd=0, highlightthickness=0,
+                           anchor="w")
+        chk.pack(fill=tk.X, pady=(0, 2 if is_grid else 1))
+        
+        # Similarity score with color coding
+        if img_path in self.similarity_scores:
+            similarity = self.similarity_scores[img_path]
+            sim_text = f"Similarity: {similarity:.0%}" if is_grid else f"{similarity:.0%}"
+            
+            # Color code based on similarity
+            if similarity >= 0.98:
+                sim_color = self.colors['success']
+            elif similarity >= 0.96:
+                sim_color = self.colors['accent']
+            elif similarity >= 0.95:
+                sim_color = self.colors['warning']
+            else:
+                sim_color = self.colors['danger']
+            
+            sim_font_size = 8 if is_grid else 7
+            sim_label = tk.Label(info_frame,
+                               text=sim_text,
+                               font=("Segoe UI", sim_font_size),
+                               bg=self.colors['bg_card'],
+                               fg=sim_color,
+                               anchor="w")
+            sim_label.pack(fill=tk.X)
+        
+        # Store checkbox and canvas references
+        self.selected_check_vars.append((var, img_path, img_canvas))
+        
+        # Hover effects
+        def on_enter(e, card=card):
+            card.configure(highlightbackground=self.colors['accent'], highlightthickness=2)
+        
+        def on_leave(e, card=card):
+            card.configure(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
+        
+        for widget in [card, img_canvas, chk]:
+            widget.bind("<Enter>", on_enter)
+            widget.bind("<Leave>", on_leave)
+
     def zoom_in(self):
         """Increase thumbnail size for better image viewing"""
         current_width, current_height = self.thumb_size
@@ -971,11 +869,8 @@ class DuplicateImageIdentifierApp:
             # Clear old canvas references
             self.selected_check_vars.clear()
             
-            # Redisplay with new thumbnail sizes
-            if len(selected) > 1:
-                self.display_multiple_groups(selected)
-            else:
-                self.display_single_selection(selected[0])
+            # Redisplay with new thumbnail sizes using unified method
+            self.display_groups(selected)
             
             # Restore checkbox states and apply cross overlays after UI update
             self.root.after(50, lambda: self.restore_checkbox_states(checkbox_states))
