@@ -6,7 +6,7 @@ import os
 import time
 from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
-                     StatusBar, ZoomControls, ModernButton, ImageUtils)
+                     StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager)
 
 class DuplicateImageIdentifierApp:
     def __init__(self, root):
@@ -79,12 +79,10 @@ class DuplicateImageIdentifierApp:
         header_buttons = tk.Frame(header, bg=self.colors['bg_primary'])
         header_buttons.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Modern trash button with icon using common component
-        self.trash_btn_var = tk.StringVar(value="🗑️ 0")
-        self.trash_btn = ModernButton.create_secondary_button(
-            header_buttons, "", self.open_trash_folder, self.colors,
-            textvariable=self.trash_btn_var)
-        self.trash_btn.pack(side=tk.RIGHT, padx=(10, 0))
+        # Create trash manager using common component
+        self.trash_manager = TrashManager(
+            header_buttons, self.colors, lambda: self.folder, IMG_EXT, button_style="emoji")
+        self.trash_manager.pack(side=tk.RIGHT, padx=(10, 0))
 
     def create_modern_content(self):
         # Main content container
@@ -276,7 +274,7 @@ class DuplicateImageIdentifierApp:
             self.lbl_folder.config(text=display_path, fg=self.colors['text_primary'])
             
             # Update trash count when folder is selected
-            self.update_trash_count()
+            self.trash_manager.update_trash_count()
             
             # Clear tree
             self.tree.delete(*self.tree.get_children())
@@ -884,34 +882,7 @@ class DuplicateImageIdentifierApp:
             if img_path in group:
                 group.remove(img_path)
 
-    def update_trash_count(self):
-        """Update trash button with count of files in trash directory"""
-        if self.folder:
-            trash_path = os.path.join(self.folder, "Trash")
-            if os.path.exists(trash_path):
-                # Count image files in trash
-                count = sum(1 for f in os.listdir(trash_path) 
-                         if os.path.isfile(os.path.join(trash_path, f)) 
-                         and os.path.splitext(f)[1].lower() in IMG_EXT)
-                self.trash_btn_var.set(f"🗑️ {count}")
-            else:
-                self.trash_btn_var.set("🗑️ 0")
-        else:
-            self.trash_btn_var.set("🗑️ 0")
 
-    def open_trash_folder(self):
-        """Open the local Trash folder in the selected directory"""
-        if not self.folder:
-            messagebox.showinfo("No Folder", "Please select a folder first to locate the Trash directory.")
-            return
-            
-        trash_dir = os.path.join(self.folder, "Trash")
-        
-        if os.path.exists(trash_dir):
-            # Open folder in Windows Explorer
-            os.startfile(trash_dir)
-        else:
-            messagebox.showinfo("Trash Empty", f"No Trash folder found at:\n{trash_dir}\n\nNo items have been cleaned yet.")
     
     def update_clean_button_count(self):
         """Update the clean button with the count of selected items"""
@@ -1109,7 +1080,7 @@ class DuplicateImageIdentifierApp:
                     self.update_clean_button_count()
                     
                     # Update trash count
-                    self.update_trash_count()
+                    self.trash_manager.update_trash_count()
                     
                     # Update status
                     if hasattr(self, 'status_bar'):

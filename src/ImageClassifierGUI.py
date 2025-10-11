@@ -13,7 +13,7 @@ from PIL import Image, ImageTk
 from ImageClassification import classify_people_vs_screenshot, IMG_EXT
 from ImageClassification import classify_people_vs_screenshot_batch
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
-                     StatusBar, ZoomControls, ModernButton, ImageUtils)
+                     StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager)
 
 class ImageClassifierApp:
     def select_all_photos(self):
@@ -304,20 +304,11 @@ class ImageClassifierApp:
         header_buttons = tk.Frame(header, bg=self.colors['bg_primary'])
         header_buttons.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Modern trash button with icon
-        self.trash_btn_var = tk.StringVar(value="🗑️ 0")
-        self.trash_btn = tk.Button(header_buttons, 
-                                  textvariable=self.trash_btn_var, 
-                                  command=self.open_trash_folder,
-                                  font=("Segoe UI", 12, "bold"),
-                                  bg=self.colors['bg_secondary'],
-                                  fg=self.colors['text_primary'],
-                                  activebackground=self.colors['bg_card'],
-                                  activeforeground=self.colors['text_primary'],
-                                  bd=0, relief=tk.FLAT, cursor="hand2",
-                                  padx=15, pady=8)
-        self.trash_btn.pack(side=tk.RIGHT, padx=(10, 0))
-        
+        # Create trash manager using common component
+        self.trash_manager = TrashManager(
+            header_buttons, self.colors, lambda: self.folder, IMG_EXT, button_style="emoji")
+        self.trash_manager.pack(side=tk.RIGHT, padx=(10, 0))
+
         # Main content container
         content = tk.Frame(self.root, bg=self.colors['bg_primary'])
         content.pack(fill=tk.BOTH, expand=True, padx=20, pady=(20, 20))
@@ -761,30 +752,7 @@ class ImageClassifierApp:
         if hasattr(self, 'progress_window') and self.progress_window.winfo_exists():
             self.progress_window.destroy()
 
-    def open_trash_folder(self):
-        if self.folder:
-            trash_path = os.path.join(self.folder, "Trash")
-            if os.path.exists(trash_path):
-                os.startfile(trash_path)  # Windows specific
-            else:
-                messagebox.showinfo("Trash Folder", "Trash folder does not exist yet.")
-        else:
-            messagebox.showinfo("Trash Folder", "Please select a folder first.")
-    
-    def update_trash_count(self):
-        if self.folder:
-            trash_path = os.path.join(self.folder, "Trash")
-            if os.path.exists(trash_path):
-                # Count image files in trash
-                count = sum(1 for f in os.listdir(trash_path) 
-                         if os.path.isfile(os.path.join(trash_path, f)) 
-                         and os.path.splitext(f)[1].lower() in IMG_EXT)
-                self.trash_count = count
-                self.trash_btn_var.set(f"Trash ({count})")
-            else:
-                self.trash_count = 0
-                self.trash_btn_var.set("Trash (0)")
-    
+
     def select_folder(self):
         folder = filedialog.askdirectory()
         if folder:
@@ -797,7 +765,7 @@ class ImageClassifierApp:
                     display_path = f"...{os.sep}{os.sep.join(parts[-2:])}"
             
             self.lbl_folder.config(text=display_path, fg=self.colors['text_primary'])
-            self.update_trash_count()  # Update trash count when folder is selected
+            self.trash_manager.update_trash_count()  # Update trash count when folder is selected
             # Walk through directory but exclude Trash folder
             self.images = []
             for dp, dn, filenames in os.walk(folder):
@@ -1400,7 +1368,7 @@ class ImageClassifierApp:
             self.update_tree_counts()
             
             # Update trash count
-            self.update_trash_count()
+            self.trash_manager.update_trash_count()
             
             # If we're in thumbnail view, remove cleaned images efficiently
             if self.current_paths:

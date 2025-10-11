@@ -506,3 +506,91 @@ class ImageUtils:
                 "Error Opening Image", 
                 f"Could not open image:\n{img_path}\n\nError: {str(e)}"
             )
+
+
+class TrashManager:
+    """
+    Manages trash functionality for PhotoSift applications.
+    
+    This class provides a unified interface for trash operations including
+    counting files in trash, updating trash button display, and opening
+    the trash folder. It can be used by both ImageClassifierGUI and
+    DuplicateImageIdentifierGUI to avoid code duplication.
+    """
+    
+    def __init__(self, parent_frame, colors, folder_callback, img_extensions, button_style="emoji"):
+        """
+        Initialize TrashManager
+        
+        Args:
+            parent_frame: The parent frame to add the trash button to
+            colors: Color scheme dictionary
+            folder_callback: Function that returns the current folder path
+            img_extensions: Set/list of supported image file extensions (e.g., IMG_EXT)
+            button_style: "emoji" for 🗑️ style, "text" for "Trash" style
+        """
+        self.parent_frame = parent_frame
+        self.colors = colors
+        self.folder_callback = folder_callback
+        self.img_extensions = img_extensions
+        self.button_style = button_style
+        
+        # Create trash button and variable
+        self.trash_btn_var = tk.StringVar(value=self._get_initial_text())
+        self.trash_btn = self._create_trash_button()
+        
+    def _get_initial_text(self):
+        """Get initial button text based on style"""
+        return "🗑️ 0" if self.button_style == "emoji" else "Trash (0)"
+    
+    def _create_trash_button(self):
+        """Create the trash button using ModernButton"""
+        return ModernButton.create_secondary_button(
+            self.parent_frame, "", self.open_trash_folder, self.colors,
+            textvariable=self.trash_btn_var)
+    
+    def pack(self, **kwargs):
+        """Pack the trash button with given arguments"""
+        self.trash_btn.pack(**kwargs)
+        
+    def get_current_folder(self):
+        """Get the current folder from the callback"""
+        return self.folder_callback()
+    
+    def update_trash_count(self):
+        """Update trash button with count of files in trash directory"""
+        folder = self.get_current_folder()
+        if folder:
+            trash_path = os.path.join(folder, "Trash")
+            if os.path.exists(trash_path):
+                # Count image files in trash
+                count = sum(1 for f in os.listdir(trash_path) 
+                         if os.path.isfile(os.path.join(trash_path, f)) 
+                         and os.path.splitext(f)[1].lower() in self.img_extensions)
+                
+                if self.button_style == "emoji":
+                    self.trash_btn_var.set(f"🗑️ {count}")
+                else:
+                    self.trash_btn_var.set(f"Trash ({count})")
+            else:
+                self.trash_btn_var.set(self._get_initial_text())
+        else:
+            self.trash_btn_var.set(self._get_initial_text())
+
+    def open_trash_folder(self):
+        """Open the local Trash folder in the selected directory"""
+        folder = self.get_current_folder()
+        if not folder:
+            tk.messagebox.showinfo("No Folder", "Please select a folder first to locate the Trash directory.")
+            return
+            
+        trash_dir = os.path.join(folder, "Trash")
+        
+        if os.path.exists(trash_dir):
+            # Open folder in Windows Explorer
+            os.startfile(trash_dir)
+        else:
+            if self.button_style == "emoji":
+                tk.messagebox.showinfo("Trash Empty", f"No Trash folder found at:\n{trash_dir}\n\nNo items have been cleaned yet.")
+            else:
+                tk.messagebox.showinfo("Trash Folder", "Trash folder does not exist yet.")
