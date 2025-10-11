@@ -8,6 +8,9 @@ and reduce code duplication.
 
 import tkinter as tk
 import tkinter.ttk as ttk
+import tkinter.messagebox
+import os
+from PIL import Image, ImageTk
 
 
 class ToolTip:
@@ -373,3 +376,103 @@ class ModernButton:
                         bd=0, relief=tk.FLAT, cursor="hand2",
                         padx=15, pady=8,
                         **kwargs)
+
+
+class ImageUtils:
+    """Utility functions for image operations"""
+    
+    @staticmethod
+    def open_full_image(parent_window, img_path):
+        """
+        Open an image in a new window at full size
+        
+        Args:
+            parent_window: The parent tkinter window
+            img_path: Path to the image file
+        """
+        try:
+            # Create new window
+            top = tk.Toplevel(parent_window)
+            top.title(f"PhotoSift - {os.path.basename(img_path)}")
+            
+            # Set window icon and properties
+            top.resizable(True, True)
+            
+            # Load and display image
+            img = Image.open(img_path)
+            
+            # Get screen dimensions to limit image size if needed
+            screen_width = top.winfo_screenwidth()
+            screen_height = top.winfo_screenheight()
+            
+            # Calculate max size (90% of screen)
+            max_width = int(screen_width * 0.9)
+            max_height = int(screen_height * 0.9)
+            
+            # Resize if image is too large for screen
+            if img.width > max_width or img.height > max_height:
+                img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            
+            img_tk = ImageTk.PhotoImage(img)
+            
+            # Create scrollable frame for large images
+            frame = tk.Frame(top)
+            frame.pack(fill=tk.BOTH, expand=True)
+            
+            canvas = tk.Canvas(frame, bg='black')
+            v_scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL, command=canvas.yview)
+            h_scrollbar = tk.Scrollbar(frame, orient=tk.HORIZONTAL, command=canvas.xview)
+            
+            canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+            
+            # Pack scrollbars and canvas
+            v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+            canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            
+            # Create image label
+            lbl = tk.Label(canvas, image=img_tk, bg='black')
+            lbl.image = img_tk  # Keep reference
+            
+            # Add image to canvas
+            canvas.create_window((0, 0), window=lbl, anchor=tk.NW)
+            
+            # Configure scroll region
+            lbl.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            
+            # Center the window
+            window_width = min(img.width + 50, max_width)
+            window_height = min(img.height + 100, max_height)
+            
+            x = (screen_width - window_width) // 2
+            y = (screen_height - window_height) // 2
+            
+            top.geometry(f"{window_width}x{window_height}+{x}+{y}")
+            
+            # Add keyboard shortcuts
+            def on_escape(event):
+                top.destroy()
+            
+            def on_space(event):
+                top.destroy()
+            
+            top.bind('<Escape>', on_escape)
+            top.bind('<space>', on_space)
+            top.focus_set()
+            
+            # Mouse wheel scrolling
+            def on_mousewheel(event):
+                if event.state == 0:  # No modifier keys
+                    canvas.yview_scroll(-1 * (event.delta // 120), "units")
+                elif event.state == 1:  # Shift key
+                    canvas.xview_scroll(-1 * (event.delta // 120), "units")
+            
+            canvas.bind("<MouseWheel>", on_mousewheel)
+            
+        except Exception as e:
+            # Show error dialog if image can't be opened
+            tkinter.messagebox.showerror(
+                "Error Opening Image", 
+                f"Could not open image:\n{img_path}\n\nError: {str(e)}"
+            )

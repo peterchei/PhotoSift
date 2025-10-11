@@ -13,7 +13,7 @@ from PIL import Image, ImageTk
 from ImageClassification import classify_people_vs_screenshot, IMG_EXT
 from ImageClassification import classify_people_vs_screenshot_batch
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
-                     StatusBar, ZoomControls, ModernButton)
+                     StatusBar, ZoomControls, ModernButton, ImageUtils)
 
 class ImageClassifierApp:
     def select_all_photos(self):
@@ -1394,15 +1394,8 @@ class ImageClassifierApp:
                 self.content_frame.pack_forget()
 
     def open_full_image(self, img_path):
-        top = tk.Toplevel(self.root)
-        top.title(os.path.basename(img_path))
-        img = Image.open(img_path)
-        img_tk = ImageTk.PhotoImage(img)
-        lbl = tk.Label(top, image=img_tk)
-        lbl.image = img_tk
-        lbl.pack()
-        self.thumb_canvas.update_idletasks()
-        self.thumb_canvas.yview_moveto(0)
+        """Open image in full-size window using common utility"""
+        ImageUtils.open_full_image(self.root, img_path)
 
     def on_image_check(self, var, path, frame=None):
         if frame:

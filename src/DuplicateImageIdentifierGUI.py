@@ -5,7 +5,7 @@ from PIL import Image, ImageTk
 import os
 from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
-                     StatusBar, ZoomControls, ModernButton)
+                     StatusBar, ZoomControls, ModernButton, ImageUtils)
 
 class DuplicateImageIdentifierApp:
     def __init__(self, root):
@@ -598,6 +598,9 @@ class DuplicateImageIdentifierApp:
         # Store canvas reference for overlay updates
         setattr(img_canvas, 'img_path', img_path)
         
+        # Add double-click to open full image
+        img_canvas.bind('<Double-Button-1>', lambda e, path=img_path: self.open_full_image(path))
+        
         # Info section for checkbox and similarity score
         info_frame = tk.Frame(img_container, bg=self.colors['bg_card'])
         info_frame.pack(fill=tk.X, pady=(5 if is_grid else 3, 0))
@@ -986,6 +989,10 @@ class DuplicateImageIdentifierApp:
         selected_count = self.count_selected_images()
         if hasattr(self, 'clean_btn_var'):
             self.clean_btn_var.set(f"Clean ({selected_count})")
+
+    def open_full_image(self, img_path):
+        """Open image in full-size window using common utility"""
+        ImageUtils.open_full_image(self.root, img_path)
 
     def update_cross_overlay(self, var, img_path):
         """Add or remove cross overlay on image based on checkbox state"""
