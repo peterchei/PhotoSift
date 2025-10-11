@@ -192,14 +192,6 @@ class DuplicateImageIdentifierApp:
         
         # Image display area with scrolling
         self.create_image_display_area(main_area)
-        
-        # Result label
-        self.lbl_result = tk.Label(main_area, 
-                                  text="Select a group to view duplicates", 
-                                  font=("Segoe UI", 16, "bold"),
-                                  bg=self.colors['bg_primary'], 
-                                  fg=self.colors['text_primary'])
-        self.lbl_result.pack(pady=(0, 20))
 
     def create_image_display_area(self, parent):
         # Container for scrollable image area
@@ -382,9 +374,6 @@ class DuplicateImageIdentifierApp:
                     self.root.after(0, self.status_bar.set_color, "#33cc33", "white")
                     
                     # Update main UI
-                    total_duplicates = sum(len(group) - 1 for group in self.groups)
-                    self.lbl_result.config(text=f"Found {len(self.groups)} images with duplicates ({total_duplicates} total duplicates)", 
-                                         fg=self.colors['success'])
                     self.populate_tree()
                     
                     # Close progress window after a short delay
@@ -396,8 +385,6 @@ class DuplicateImageIdentifierApp:
                     print(f"[ERROR] {error_msg}")
                     
                     self.update_progress(0, total, "Processing Failed", error_msg)
-                    self.lbl_result.config(text="Processing failed. Check console for details.", 
-                                         fg=self.colors['danger'])
                     
                     # Update status bar with error
                     self.root.after(0, self.status_bar.set_text, f"Processing failed: {str(e)}")
@@ -544,14 +531,10 @@ class DuplicateImageIdentifierApp:
                 total_images += len(group_images)
                 current_row += 1
         
-        # Update result label and status
+        # Update status
         if is_single_group:
-            self.lbl_result.config(text=f"Viewing group - {total_images} images", 
-                                 fg=self.colors['text_primary'])
             self.status_bar.set_text(f"Viewing duplicate group with {total_images} images")
         else:
-            self.lbl_result.config(text=f"Viewing {len(selected_items)} groups - {total_images} total images", 
-                                 fg=self.colors['text_primary'])
             self.status_bar.set_text(f"Viewing {len(selected_items)} groups with {total_images} images")
     
     def display_images_in_grid(self, group_images, start_row):
@@ -749,8 +732,8 @@ class DuplicateImageIdentifierApp:
             self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
     
     def select_all_groups(self):
-        """Select all images via checkboxes, or all groups if no images displayed"""
-        # If there are image checkboxes visible, toggle them
+        """Smart select: when images are displayed, selects only duplicates (keeps originals unchecked)"""
+        # If there are image checkboxes visible, use smart selection
         if self.selected_check_vars:
             self.toggle_select_all_images()
         else:
@@ -968,23 +951,42 @@ class DuplicateImageIdentifierApp:
                   if len(item) >= 2 and item[0].get())
     
     def toggle_select_all_images(self):
-        """Toggle selection of all visible images"""
+        """Smart selection: Keep first image in each group unchecked, select duplicates"""
         if not self.selected_check_vars:
             return
-            
-        # Check current state of first checkbox to determine action
-        first_var = self.selected_check_vars[0][0]
-        new_state = not first_var.get()
+        
+        # Create a set of first images (ones to keep) from all groups
+        first_images = set()
+        if hasattr(self, 'groups') and self.groups:
+            for group in self.groups:
+                if group:  # Make sure group is not empty
+                    first_images.add(group[0])  # First image in each group
+        
+        # Check if any duplicates are currently selected (excluding first images)
+        duplicates_selected = any(
+            item[0].get() for item in self.selected_check_vars 
+            if len(item) >= 2 and item[1] not in first_images
+        )
+        
+        # If any duplicates are selected, clear all selections
+        # If no duplicates are selected, select all duplicates (but keep first images unchecked)
+        new_state = not duplicates_selected
         
         # Temporarily disable callback updates to prevent performance issues
         self._updating_bulk_selection = True
         
         try:
-            # Apply to all checkboxes
+            # Apply smart selection logic
             for item in self.selected_check_vars:
                 if len(item) >= 2:
                     var, img_path = item[0], item[1]
-                    var.set(new_state)
+                    
+                    # If this is a first image (original), always keep it unchecked
+                    if img_path in first_images:
+                        var.set(False)
+                    else:
+                        # This is a duplicate, apply the toggle state
+                        var.set(new_state)
         finally:
             # Re-enable callback updates
             self._updating_bulk_selection = False
