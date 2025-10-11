@@ -20,7 +20,7 @@ class DuplicateImageIdentifierApp:
         self.groups = []
         
         # Selection and confidence tracking
-        self.selected_check_vars = []  # List of (checkbox_var, image_path) tuples
+        self.selected_check_vars = []  # List of (checkbox_var, image_path, img_canvas) tuples
         self.similarity_scores = {}  # path -> similarity score for duplicates
         self._updating_bulk_selection = False  # Flag to prevent callback loops during bulk operations
         
@@ -896,7 +896,7 @@ class DuplicateImageIdentifierApp:
         # Priority: Use checkbox selections if available, otherwise use tree selection
         if self.selected_check_vars:
             # Count selected checkboxes
-            selected_count = sum(1 for var, _ in self.selected_check_vars if var.get())
+            selected_count = sum(1 for var, _, _ in self.selected_check_vars if var.get())
         elif self.tree:
             # Fall back to tree selection count
             selected_count = len(self.tree.selection())

@@ -381,22 +381,51 @@ class ModernButton:
 class ImageUtils:
     """Utility functions for image operations"""
     
+    # Class variable to track the current image window
+    _current_image_window = None
+    
     @staticmethod
     def open_full_image(parent_window, img_path):
         """
-        Open an image in a new window at full size
+        Open an image in a reusable window at full size
+        
+        This function reuses the same window for viewing images to prevent
+        multiple image windows from accumulating. If a window is already open,
+        it will be reused and updated with the new image content.
         
         Args:
             parent_window: The parent tkinter window
             img_path: Path to the image file
         """
         try:
-            # Create new window
-            top = tk.Toplevel(parent_window)
-            top.title(f"PhotoSift - {os.path.basename(img_path)}")
+            # Check if we already have an image window open
+            if ImageUtils._current_image_window and ImageUtils._current_image_window.winfo_exists():
+                # Reuse existing window
+                top = ImageUtils._current_image_window
+                top.title(f"PhotoSift - {os.path.basename(img_path)}")
+                
+                # Clear existing content
+                for widget in top.winfo_children():
+                    widget.destroy()
+            else:
+                # Create new window
+                top = tk.Toplevel(parent_window)
+                top.title(f"PhotoSift - {os.path.basename(img_path)}")
+                ImageUtils._current_image_window = top
+                
+                # Set cleanup when window is closed
+                def on_window_close():
+                    ImageUtils._current_image_window = None
+                    top.destroy()
+                
+                top.protocol("WM_DELETE_WINDOW", on_window_close)
             
             # Set window icon and properties
             top.resizable(True, True)
+            
+            # Bring window to front
+            top.lift()
+            top.focus_set()
             
             # Load and display image
             img = Image.open(img_path)
@@ -452,14 +481,15 @@ class ImageUtils:
             
             # Add keyboard shortcuts
             def on_escape(event):
+                ImageUtils._current_image_window = None
                 top.destroy()
             
             def on_space(event):
+                ImageUtils._current_image_window = None
                 top.destroy()
             
             top.bind('<Escape>', on_escape)
             top.bind('<space>', on_space)
-            top.focus_set()
             
             # Mouse wheel scrolling
             def on_mousewheel(event):
