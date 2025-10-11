@@ -4,7 +4,8 @@ import tkinter.ttk as ttk
 from PIL import Image, ImageTk
 import os
 from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
-from CommonUI import ToolTip
+from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
+                     StatusBar, ZoomControls, ModernButton)
 
 class DuplicateImageIdentifierApp:
     def __init__(self, root):
@@ -12,18 +13,8 @@ class DuplicateImageIdentifierApp:
         self.root.title("PhotoSift - Duplicate Image Identifier")
         self.root.state('zoomed')  # Start maximized
         
-        # Modern color scheme (same as ImageClassifierGUI)
-        self.colors = {
-            'bg_primary': '#1e293b',      # Dark blue background
-            'bg_secondary': '#334155',    # Secondary dark blue
-            'bg_card': '#475569',         # Card background
-            'accent': '#3b82f6',          # Blue accent
-            'text_primary': '#f1f5f9',    # White text
-            'text_secondary': '#94a3b8',  # Light gray text
-            'success': '#10b981',         # Green
-            'warning': '#f59e0b',         # Orange
-            'danger': '#ef4444'           # Red
-        }
+        # Use centralized color scheme
+        self.colors = ModernColors.get_color_scheme()
         
         self.folder = None
         self.groups = []
@@ -39,9 +30,14 @@ class DuplicateImageIdentifierApp:
         self.min_thumb_size = (80, 60)  # Minimum size
         self.max_thumb_size = (300, 225)  # Maximum size
         
+        # Initialize progress window
+        self.progress_window = ProgressWindow(self.root, "Processing Images - Duplicate Detection")
+        
         self.setup_ui()
-        self.apply_modern_styling()
-        self.create_status_bar()
+        ModernStyling.apply_modern_styling(self.colors)
+        
+        # Create status bar using common component
+        self.status_bar = StatusBar(self.root, self.colors, "Ready - Select a folder to find duplicates")
 
     def setup_ui(self):
         # Configure main window
@@ -81,18 +77,11 @@ class DuplicateImageIdentifierApp:
         header_buttons = tk.Frame(header, bg=self.colors['bg_primary'])
         header_buttons.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Modern trash button with icon
+        # Modern trash button with icon using common component
         self.trash_btn_var = tk.StringVar(value="🗑️ 0")
-        self.trash_btn = tk.Button(header_buttons, 
-                                  textvariable=self.trash_btn_var, 
-                                  command=self.open_trash_folder,
-                                  font=("Segoe UI", 12, "bold"),
-                                  bg=self.colors['bg_secondary'],
-                                  fg=self.colors['text_primary'],
-                                  activebackground=self.colors['bg_card'],
-                                  activeforeground=self.colors['text_primary'],
-                                  bd=0, relief=tk.FLAT, cursor="hand2",
-                                  padx=15, pady=8)
+        self.trash_btn = ModernButton.create_secondary_button(
+            header_buttons, "", self.open_trash_folder, self.colors,
+            textvariable=self.trash_btn_var)
         self.trash_btn.pack(side=tk.RIGHT, padx=(10, 0))
 
     def create_modern_content(self):
@@ -116,19 +105,9 @@ class DuplicateImageIdentifierApp:
         folder_section = tk.Frame(sidebar, bg=self.colors['bg_secondary'])
         folder_section.pack(fill=tk.X, padx=20, pady=(20, 10))
         
-        # Modern select folder button
-        self.select_btn = tk.Button(folder_section, 
-                                   text="Select Folder", 
-                                   command=self.select_folder,
-                                   font=("Segoe UI", 11, "bold"),
-                                   bg=self.colors['accent'],
-                                   fg=self.colors['text_primary'],
-                                   activebackground='#2563eb',
-                                   activeforeground=self.colors['text_primary'],
-                                   bd=0,
-                                   padx=20,
-                                   pady=8,
-                                   cursor="hand2")
+        # Modern select folder button using common component
+        self.select_btn = ModernButton.create_primary_button(
+            folder_section, "Select Folder", self.select_folder, self.colors)
         self.select_btn.pack(fill=tk.X)
         
         # Folder path display
@@ -188,67 +167,25 @@ class DuplicateImageIdentifierApp:
         nav_bar.pack(fill=tk.X, pady=(0, 20))
         nav_bar.pack_propagate(False)
         
-        # Zoom controls (left side)
-        zoom_frame = tk.Frame(nav_bar, bg=self.colors['bg_primary'])
-        zoom_frame.pack(side=tk.LEFT, fill=tk.Y)
-        
-        self.zoom_out_btn = tk.Button(zoom_frame, 
-                                     text="🔍-", 
-                                     command=self.zoom_out,
-                                     font=("Segoe UI", 14),
-                                     bg=self.colors['bg_secondary'],
-                                     fg=self.colors['text_primary'],
-                                     activebackground=self.colors['bg_card'],
-                                     bd=0, relief=tk.FLAT, cursor="hand2",
-                                     padx=12, pady=8)
-        self.zoom_out_btn.pack(side=tk.LEFT, padx=(0, 5))
-        
-        self.zoom_in_btn = tk.Button(zoom_frame, 
-                                    text="🔍+", 
-                                    command=self.zoom_in,
-                                    font=("Segoe UI", 14),
-                                    bg=self.colors['bg_secondary'],
-                                    fg=self.colors['text_primary'],
-                                    activebackground=self.colors['bg_card'],
-                                    bd=0, relief=tk.FLAT, cursor="hand2",
-                                    padx=12, pady=8)
-        self.zoom_in_btn.pack(side=tk.LEFT, padx=(0, 10))
-        
-        self.zoom_label = tk.Label(zoom_frame, 
-                                  text="100%", 
-                                  font=("Segoe UI", 12), 
-                                  bg=self.colors['bg_primary'], 
-                                  fg=self.colors['text_secondary'])
-        self.zoom_label.pack(side=tk.LEFT, fill=tk.Y)
+        # Use common zoom controls
+        self.zoom_controls = ZoomControls(nav_bar, self.colors, self.zoom_in, self.zoom_out)
+        self.zoom_controls.pack(side=tk.LEFT, fill=tk.Y)
         
         # Action buttons (right side of nav bar)
         action_frame = tk.Frame(nav_bar, bg=self.colors['bg_primary'])
         action_frame.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Modern Select All button
-        self.select_all_btn = tk.Button(action_frame, 
-                                       text="Select All", 
-                                       command=self.select_all_groups,
-                                       font=("Segoe UI", 12, "bold"),
-                                       bg=self.colors['accent'],
-                                       fg=self.colors['text_primary'],
-                                       activebackground='#2563eb',
-                                       bd=0, relief=tk.FLAT, cursor="hand2",
-                                       padx=16, pady=8)
+        # Action buttons using ModernButton factory
+        self.select_all_btn = ModernButton.create_primary_button(
+            action_frame, "Select All", self.select_all_groups, self.colors)
         self.select_all_btn.pack(side=tk.LEFT, padx=(0, 10))
         
-        # Modern Clean button
+        # Clean button with variable text
         self.clean_btn_var = tk.StringVar()
         self.clean_btn_var.set("Clean (0)")
-        self.clean_btn = tk.Button(action_frame, 
-                                  textvariable=self.clean_btn_var,
-                                  command=self.clean_selected_images,
-                                  font=("Segoe UI", 12, "bold"),
-                                  bg=self.colors['danger'],
-                                  fg=self.colors['text_primary'],
-                                  activebackground='#dc2626',
-                                  bd=0, relief=tk.FLAT, cursor="hand2",
-                                  padx=16, pady=8)
+        self.clean_btn = ModernButton.create_danger_button(
+            action_frame, "", self.clean_selected_images, self.colors, 
+            textvariable=self.clean_btn_var)
         self.clean_btn.pack(side=tk.LEFT)
         
         # Image display area with scrolling
@@ -299,128 +236,16 @@ class DuplicateImageIdentifierApp:
         self.img_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def show_progress_window(self, total):
-        # Create modern progress window
-        self.progress_window = tk.Toplevel(self.root)
-        self.progress_window.title("Processing Images - Duplicate Detection")
-        self.progress_window.geometry("450x180")
-        self.progress_window.transient(self.root)
-        self.progress_window.grab_set()
-        
-        # Center the progress window
-        window_width = 450
-        window_height = 180
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-        x = (screen_width - window_width) // 2
-        y = (screen_height - window_height) // 2
-        self.progress_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
-        
-        # Modern progress window styling
-        self.progress_window.configure(bg=self.colors['bg_primary'])
-        frame = tk.Frame(self.progress_window, bg=self.colors['bg_primary'], padx=30, pady=25)
-        frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Modern progress label
-        self.progress_label = tk.Label(frame, 
-                                      text="Initializing Duplicate Detection...", 
-                                      font=("Segoe UI", 13, "bold"), 
-                                      bg=self.colors['bg_primary'],
-                                      fg=self.colors['text_primary'])
-        self.progress_label.pack(pady=(0, 15))
-        
-        # Modern progress bar
-        self.progress_var = tk.DoubleVar()
-        style = ttk.Style()
-        style.configure("Modern.Horizontal.TProgressbar", 
-                       thickness=20, 
-                       background=self.colors['accent'],
-                       troughcolor=self.colors['bg_secondary'],
-                       borderwidth=0)
-        self.progress_bar = ttk.Progressbar(frame, 
-                                          style="Modern.Horizontal.TProgressbar", 
-                                          length=390, mode='determinate', 
-                                          maximum=total, variable=self.progress_var)
-        self.progress_bar.pack(pady=(0, 15))
-        
-        # Modern detailed status
-        self.progress_detail = tk.Label(frame, 
-                                       text="", 
-                                       font=("Segoe UI", 11), 
-                                       bg=self.colors['bg_primary'], 
-                                       fg=self.colors['text_secondary'])
-        self.progress_detail.pack()
+        """Show progress window using common component"""
+        self.progress_window.show(total, "Initializing Duplicate Detection...")
 
     def update_progress(self, current, total, status_text, detail_text=""):
-        if hasattr(self, 'progress_window') and self.progress_window.winfo_exists():
-            self.progress_var.set(current)
-            self.progress_label.config(text=status_text)
-            if detail_text:
-                self.progress_detail.config(text=detail_text)
-            self.progress_window.update_idletasks()
+        """Update progress window using common component"""
+        self.progress_window.update(current, total, status_text, detail_text)
 
     def close_progress(self):
-        if hasattr(self, 'progress_window') and self.progress_window.winfo_exists():
-            self.progress_window.destroy()
-
-    def apply_modern_styling(self):
-        # Configure TTK styles
-        style = ttk.Style()
-        
-        # Set modern theme
-        try:
-            style.theme_use('clam')
-        except:
-            pass
-        
-        # Tree styling
-        style.configure("Modern.Treeview",
-                       rowheight=28,
-                       fieldbackground=self.colors['bg_card'],
-                       background=self.colors['bg_card'],
-                       foreground=self.colors['text_primary'],
-                       selectbackground=self.colors['accent'],
-                       selectforeground=self.colors['text_primary'],
-                       borderwidth=0,
-                       relief="flat")
-        
-        style.map("Modern.Treeview",
-                 background=[('selected', self.colors['accent']),
-                           ('active', self.colors['bg_secondary'])],
-                 foreground=[('selected', self.colors['text_primary']),
-                           ('active', self.colors['text_primary'])])
-        
-        # Scrollbar styling
-        style.configure("Modern.Vertical.TScrollbar",
-                       background=self.colors['bg_secondary'],
-                       troughcolor=self.colors['bg_primary'],
-                       borderwidth=0,
-                       arrowcolor=self.colors['text_secondary'],
-                       darkcolor=self.colors['bg_secondary'],
-                       lightcolor=self.colors['bg_secondary'])
-        
-        style.configure("Modern.Horizontal.TScrollbar",
-                       background=self.colors['bg_secondary'],
-                       troughcolor=self.colors['bg_primary'],
-                       borderwidth=0,
-                       arrowcolor=self.colors['text_secondary'],
-                       darkcolor=self.colors['bg_secondary'],
-                       lightcolor=self.colors['bg_secondary'])
-
-    def create_status_bar(self):
-        # Modern status bar at bottom
-        status_frame = tk.Frame(self.root, bg=self.colors['bg_secondary'], height=35)
-        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        status_frame.pack_propagate(False)
-        
-        self.status_var = tk.StringVar()
-        self.status_var.set("Ready - Select a folder to find duplicates")
-        self.status_bar = tk.Label(status_frame, 
-                                  textvariable=self.status_var, 
-                                  bd=0, relief=tk.FLAT, anchor=tk.W, 
-                                  bg=self.colors['bg_secondary'], 
-                                  fg=self.colors['text_secondary'], 
-                                  font=("Segoe UI", 11))
-        self.status_bar.pack(fill=tk.BOTH, expand=True, padx=20)
+        """Close progress window using common component"""
+        self.progress_window.close()
 
     def get_similarity_tooltip(self, similarity_score):
         """Generate tooltip text for similarity scores"""
@@ -465,7 +290,7 @@ class DuplicateImageIdentifierApp:
             total = len(files)
             
             if total == 0:
-                self.status_var.set("No images found in selected folder")
+                self.status_bar.set_text("No images found in selected folder")
                 messagebox.showinfo("No Images", "No images found in the selected folder.")
                 return
             
@@ -499,7 +324,7 @@ class DuplicateImageIdentifierApp:
                         
                         # Update status bar
                         status_bar_text = f"Processing images {start+1}-{end}/{total} ({percent}%)"
-                        self.root.after(0, self.status_var.set, status_bar_text)
+                        self.root.after(0, self.status_bar.set_text, status_bar_text)
                         
                         try:
                             batch_embeddings = get_clip_embedding_batch(batch_files)
@@ -512,14 +337,14 @@ class DuplicateImageIdentifierApp:
                     # Update progress for duplicate detection phase
                     self.update_progress(total, total, "Identifying Duplicates...", 
                                        "Comparing image similarities and grouping duplicates...")
-                    self.root.after(0, self.status_var.set, "Identifying duplicate groups...")
+                    self.root.after(0, self.status_bar.set_text, "Identifying duplicate groups...")
                     
                     # Define progress callback for duplicate detection
                     def duplicate_progress_callback(current, total_imgs, status_text, detail_text):
                         self.root.after(0, self.update_progress, current, total_imgs, status_text, detail_text)
                         percent = int((current / total_imgs) * 100) if total_imgs > 0 else 100
                         status_bar_text = f"Identifying duplicates: {current}/{total_imgs} ({percent}%)"
-                        self.root.after(0, self.status_var.set, status_bar_text)
+                        self.root.after(0, self.status_bar.set_text, status_bar_text)
                     
                     # Get groups and similarity scores
                     result = group_similar_images_clip(folder=folder, embeddings=embeddings, files=files, 
@@ -540,8 +365,8 @@ class DuplicateImageIdentifierApp:
                     
                     # Update status bar with final result
                     final_status_text = f"Done! {len(self.groups)} images have duplicates ({total_duplicates} total) from {total} images (100%)"
-                    self.root.after(0, self.status_var.set, final_status_text)
-                    self.root.after(0, self.status_bar.config, {"bg": "#33cc33", "fg": "white"})
+                    self.root.after(0, self.status_bar.set_text, final_status_text)
+                    self.root.after(0, self.status_bar.set_color, "#33cc33", "white")
                     
                     # Update main UI
                     total_duplicates = sum(len(group) - 1 for group in self.groups)
@@ -562,8 +387,8 @@ class DuplicateImageIdentifierApp:
                                          fg=self.colors['danger'])
                     
                     # Update status bar with error
-                    self.root.after(0, self.status_var.set, f"Processing failed: {str(e)}")
-                    self.root.after(0, self.status_bar.config, {"bg": "#cc3333", "fg": "white"})
+                    self.root.after(0, self.status_bar.set_text, f"Processing failed: {str(e)}")
+                    self.root.after(0, self.status_bar.set_color, "#cc3333", "white")
                     
                     # Close progress window after error
                     self.root.after(3000, self.close_progress)
@@ -577,7 +402,7 @@ class DuplicateImageIdentifierApp:
         
         # Update status bar for tree population
         total_duplicates = sum(len(group) - 1 for group in self.groups)
-        self.status_var.set(f"Building tree view for {len(self.groups)} images with duplicates...")
+        self.status_bar.set_text(f"Building tree view for {len(self.groups)} images with duplicates...")
         
         self.tree.delete(*self.tree.get_children())
         
@@ -611,9 +436,9 @@ class DuplicateImageIdentifierApp:
         if len(self.groups) > 0:
             total_images = sum(len(group) for group in self.groups)
             total_duplicates = sum(len(group) - 1 for group in self.groups)
-            self.status_var.set(f"Ready - {len(self.groups)} images have duplicates ({total_duplicates} total duplicates)")
+            self.status_bar.set_text(f"Ready - {len(self.groups)} images have duplicates ({total_duplicates} total duplicates)")
         else:
-            self.status_var.set("No duplicates found - all images are unique")
+            self.status_bar.set_text("No duplicates found - all images are unique")
         
         # Initialize zoom controls
         self.update_zoom_controls()
@@ -710,11 +535,11 @@ class DuplicateImageIdentifierApp:
         if is_single_group:
             self.lbl_result.config(text=f"Viewing group - {total_images} images", 
                                  fg=self.colors['text_primary'])
-            self.status_var.set(f"Viewing duplicate group with {total_images} images")
+            self.status_bar.set_text(f"Viewing duplicate group with {total_images} images")
         else:
             self.lbl_result.config(text=f"Viewing {len(selected_items)} groups - {total_images} total images", 
                                  fg=self.colors['text_primary'])
-            self.status_var.set(f"Viewing {len(selected_items)} groups with {total_images} images")
+            self.status_bar.set_text(f"Viewing {len(selected_items)} groups with {total_images} images")
     
     def display_images_in_grid(self, group_images, start_row):
         """Display images in a grid layout (for single group selection)"""
@@ -872,13 +697,13 @@ class DuplicateImageIdentifierApp:
         """Update zoom button states and percentage label"""
         can_zoom_in = self.thumb_size[0] < self.max_thumb_size[0]
         can_zoom_out = self.thumb_size[0] > self.min_thumb_size[0]
-        self.zoom_in_btn.config(state=tk.NORMAL if can_zoom_in else tk.DISABLED)
-        self.zoom_out_btn.config(state=tk.NORMAL if can_zoom_out else tk.DISABLED)
         
         # Calculate and display zoom percentage
         base_width = 180  # Reference width (default thumb_size)
         zoom_level = int((self.thumb_size[0] / base_width) * 100)
-        self.zoom_label.config(text=f"{zoom_level}%")
+        
+        # Use common zoom controls component
+        self.zoom_controls.update_controls(can_zoom_in, can_zoom_out, zoom_level)
     
     def refresh_current_view(self):
         """Refresh the current image view after zoom change"""

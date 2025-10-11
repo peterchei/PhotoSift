@@ -12,7 +12,8 @@ from PIL import Image, ImageTk
 # Local imports
 from ImageClassification import classify_people_vs_screenshot, IMG_EXT
 from ImageClassification import classify_people_vs_screenshot_batch
-from CommonUI import ToolTip
+from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
+                     StatusBar, ZoomControls, ModernButton)
 
 class ImageClassifierApp:
     def select_all_photos(self):
@@ -193,7 +194,16 @@ class ImageClassifierApp:
         self.min_thumb_size = (60, 45)  # Minimum size
         self.max_thumb_size = (580, 360)  # Maximum size
         
+        # Use centralized color scheme
+        self.colors = ModernColors.get_color_scheme()
+        
+        # Initialize progress window
+        self.progress_window = ProgressWindow(self.root, "AI Image Classification")
+        
         self.setup_ui()
+        
+        # Apply modern styling using common component
+        ModernStyling.apply_modern_styling(self.colors)
         
         # Apply dark theme after UI setup with multiple attempts
         self.root.after(100, self.apply_dark_theme_fix)
@@ -260,20 +270,7 @@ class ImageClassifierApp:
     def setup_ui(self):
         import tkinter.ttk as ttk
         
-        # Modern dark theme colors
-        self.colors = {
-            'bg_primary': '#1e293b',      # Dark blue background
-            'bg_secondary': '#334155',    # Lighter dark blue
-            'bg_card': '#475569',         # Card background
-            'bg_sidebar': '#2d3748',      # Sidebar background
-            'accent': '#3b82f6',          # Blue accent
-            'accent_hover': '#2563eb',    # Blue hover
-            'text_primary': '#f1f5f9',    # White text
-            'text_secondary': '#94a3b8',  # Light gray text
-            'success': '#10b981',         # Green
-            'warning': '#f59e0b',         # Orange
-            'danger': '#ef4444'           # Red
-        }
+        # Colors are now loaded in __init__ from ModernColors
         
         self.root.configure(bg=self.colors['bg_primary'])
 
@@ -681,20 +678,8 @@ class ImageClassifierApp:
                                   fg=self.colors['text_primary'])
         self.lbl_result.pack(pady=10)
 
-        # Modern status bar at bottom
-        status_frame = tk.Frame(self.root, bg=self.colors['bg_secondary'], height=35)
-        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        status_frame.pack_propagate(False)
-        
-        self.status_var = tk.StringVar()
-        self.status_var.set("")
-        self.status_bar = tk.Label(status_frame, 
-                                  textvariable=self.status_var, 
-                                  bd=0, relief=tk.FLAT, anchor=tk.W, 
-                                  bg=self.colors['bg_secondary'], 
-                                  fg=self.colors['text_secondary'], 
-                                  font=("Segoe UI", 11))
-        self.status_bar.pack(fill=tk.BOTH, expand=True, padx=20)
+        # Create status bar using common component
+        self.status_bar = StatusBar(self.root, self.colors, "Ready - Select a folder to classify images")
 
     def on_canvas_configure(self, event=None):
         # Update scroll region
@@ -828,7 +813,7 @@ class ImageClassifierApp:
             
             # Show progress window
             self.root.after(0, self.show_progress_window, total)
-            self.status_var.set(f"Processing 0/{total} images (0%)...")
+            self.status_bar.set_text(f"Processing 0/{total} images (0%)...")
             self.root.update_idletasks()
 
             def process_images():
@@ -845,7 +830,7 @@ class ImageClassifierApp:
                     
                     # Update both progress window and status bar
                     self.root.after(0, self.update_progress, end, total, status_text, detail_text)
-                    self.root.after(0, self.status_var.set, f"Processing images {start+1}-{end}/{total} ({percent}%)")
+                    self.root.after(0, self.status_bar.set_text, f"Processing images {start+1}-{end}/{total} ({percent}%)")
                     
                     batch_results = classify_people_vs_screenshot_batch(batch_paths)
                     for p, result in zip(batch_paths, batch_results):
@@ -871,8 +856,8 @@ class ImageClassifierApp:
                 screenshot_count = len(self.screenshot_images)
                 final_status = f"Completed! Found {people_count} people and {screenshot_count} screenshots"
                 self.root.after(0, self.update_progress, total, total, "Processing Complete!", final_status)
-                self.root.after(0, self.status_var.set, f"Done processing {total} images. (100%) | People: {people_count} | Screenshot: {screenshot_count}")
-                self.root.after(0, self.status_bar.config, {"bg": "#33cc33", "fg": "white"})
+                self.root.after(0, self.status_bar.set_text, f"Done processing {total} images. (100%) | People: {people_count} | Screenshot: {screenshot_count}")
+                self.root.after(0, self.status_bar.set_color, "#33cc33", "white")
                 
                 # Update UI
                 self.current = 0
