@@ -629,7 +629,7 @@ class DuplicateImageIdentifierApp:
         # Similarity score with color coding
         if img_path in self.similarity_scores:
             similarity = self.similarity_scores[img_path]
-            sim_text = f"Similarity: {similarity:.0%}" if is_grid else f"{similarity:.0%}"
+            sim_text = f"Similarity: {similarity:.0%}" if is_grid else f"Similarity: {similarity:.0%}"
             
             # Color code based on similarity
             if similarity >= 0.98:
