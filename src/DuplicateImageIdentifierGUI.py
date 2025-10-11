@@ -32,6 +32,12 @@ class DuplicateImageIdentifierApp:
         self.min_thumb_size = (80, 60)  # Minimum size
         self.max_thumb_size = (300, 225)  # Maximum size
         
+        # Image caching system for performance
+        self.image_cache = {}  # cache_key -> ImageTk.PhotoImage
+        self.cache_access_order = []  # For LRU cache management
+        self.max_cache_size = 300  # Maximum number of cached images
+        self.cache_stats = {'hits': 0, 'misses': 0, 'evictions': 0}
+        
         # Initialize progress window
         self.progress_window = ProgressWindow(self.root, "Processing Images - Duplicate Detection")
         
@@ -124,11 +130,12 @@ class DuplicateImageIdentifierApp:
         groups_section = tk.Frame(sidebar, bg=self.colors['bg_secondary'])
         groups_section.pack(fill=tk.BOTH, expand=True, padx=20, pady=(5, 0))
         
-        tk.Label(groups_section, 
+        self.duplications_label = tk.Label(groups_section, 
                 text="Duplications", 
                 font=("Segoe UI", 14, "bold"),
                 bg=self.colors['bg_secondary'], 
-                fg=self.colors['text_primary']).pack(anchor="w", pady=(0, 10))
+                fg=self.colors['text_primary'])
+        self.duplications_label.pack(anchor="w", pady=(0, 10))
         
         # Tree view with modern styling
         tree_container = tk.Frame(groups_section, bg=self.colors['bg_card'])
@@ -153,6 +160,7 @@ class DuplicateImageIdentifierApp:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+        self.tree.bind("<Control-a>", self.handle_ctrl_a)
         
         # Add placeholder text
         placeholder_id = self.tree.insert("", "end", text="📁 Select a folder to find duplicates", tags=("placeholder",))
@@ -263,9 +271,79 @@ class DuplicateImageIdentifierApp:
         
         return f"{level}\n{percentage:.1f}% Similarity\n\n{description}"
 
+    def get_cached_thumbnail(self, img_path, thumb_size):
+        """Get cached thumbnail or create and cache new one with LRU management"""
+        # Create unique cache key based on path and size
+        cache_key = f"{img_path}_{thumb_size[0]}x{thumb_size[1]}"
+        
+        # Check if image is in cache
+        if cache_key in self.image_cache:
+            self.cache_stats['hits'] += 1
+            # Move to end for LRU management
+            self.cache_access_order.remove(cache_key)
+            self.cache_access_order.append(cache_key)
+            return self.image_cache[cache_key]
+        
+        # Cache miss - load and process image
+        self.cache_stats['misses'] += 1
+        
+        try:
+            # Load and resize image
+            img = Image.open(img_path)
+            img.thumbnail(thumb_size, Image.Resampling.LANCZOS)
+            img_tk = ImageTk.PhotoImage(img)
+            
+            # Manage cache size with LRU eviction
+            if len(self.image_cache) >= self.max_cache_size:
+                # Remove oldest entries (LRU)
+                evict_count = max(1, self.max_cache_size // 10)  # Remove 10% when full
+                for _ in range(evict_count):
+                    if self.cache_access_order:
+                        oldest_key = self.cache_access_order.pop(0)
+                        if oldest_key in self.image_cache:
+                            del self.image_cache[oldest_key]
+                            self.cache_stats['evictions'] += 1
+            
+            # Cache the result
+            self.image_cache[cache_key] = img_tk
+            self.cache_access_order.append(cache_key)
+            return img_tk
+            
+        except Exception as e:
+            print(f"Error loading image {img_path}: {e}")
+            return None
+    
+    def clear_image_cache(self):
+        """Clear the image cache and reset statistics"""
+        self.image_cache.clear()
+        self.cache_access_order.clear()
+        print(f"Cache cleared. Stats - Hits: {self.cache_stats['hits']}, Misses: {self.cache_stats['misses']}, Evictions: {self.cache_stats['evictions']}")
+        self.cache_stats = {'hits': 0, 'misses': 0, 'evictions': 0}
+    
+    def print_cache_stats(self):
+        """Print current cache statistics for performance monitoring"""
+        total_requests = self.cache_stats['hits'] + self.cache_stats['misses']
+        if total_requests > 0:
+            hit_rate = (self.cache_stats['hits'] / total_requests) * 100
+            print(f"Cache Stats - Size: {len(self.image_cache)}, Hit Rate: {hit_rate:.1f}%, Hits: {self.cache_stats['hits']}, Misses: {self.cache_stats['misses']}, Evictions: {self.cache_stats['evictions']}")
+        else:
+            print(f"Cache Stats - Size: {len(self.image_cache)}, No requests yet")
+    
+    def update_duplications_label(self):
+        """Update the duplications label with the current group count"""
+        if hasattr(self, 'groups') and self.groups:
+            group_count = len(self.groups)
+            total_duplicates = sum(len(group) - 1 for group in self.groups)
+            self.duplications_label.config(text=f"Duplications ({group_count})")
+        else:
+            self.duplications_label.config(text="Duplications")
+
     def select_folder(self):
         folder = filedialog.askdirectory()
         if folder:
+            # Clear cache when selecting new folder to free memory
+            self.clear_image_cache()
+            
             self.folder = folder
             # Truncate path if too long
             display_path = folder
@@ -406,6 +484,8 @@ class DuplicateImageIdentifierApp:
         
         if not self.groups:
             no_duplicates_id = self.tree.insert("", "end", text="✅ No duplicates found", tags=("no_duplicates",))
+            # Update duplications label for no groups case
+            self.update_duplications_label()
             return
         
         for i, group in enumerate(self.groups, 1):
@@ -440,6 +520,9 @@ class DuplicateImageIdentifierApp:
         
         # Initialize zoom controls
         self.update_zoom_controls()
+        
+        # Update duplications label with count
+        self.update_duplications_label()
 
     def on_tree_select(self, event):
         selected = self.tree.selection()
@@ -507,14 +590,10 @@ class DuplicateImageIdentifierApp:
                 child_item = self.tree.item(child)
                 if 'values' in child_item and child_item['values']:
                     img_path = child_item['values'][0]
-                    try:
-                        img = Image.open(img_path)
-                        img.thumbnail(thumb_size, Image.Resampling.LANCZOS)
-                        img_tk = ImageTk.PhotoImage(img)
+                    # Use cached thumbnail for much faster loading
+                    img_tk = self.get_cached_thumbnail(img_path, thumb_size)
+                    if img_tk:
                         group_images.append((img_tk, img_path))
-                    except Exception as e:
-                        print(f"Error loading image {img_path}: {e}")
-                        continue
             
             # Display images with appropriate layout
             if group_images:
@@ -729,6 +808,30 @@ class DuplicateImageIdentifierApp:
             # Update scroll region
             self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
     
+    def handle_ctrl_a(self, event=None):
+        """Handle Ctrl+A in tree view to select all groups"""
+        if not self.tree:
+            return "break"
+            
+        # Clear current selection
+        self.tree.selection_remove(self.tree.selection())
+        
+        # Get all top-level items (groups) in the tree
+        group_items = self.tree.get_children()
+        
+        # Skip if no groups
+        if not group_items:
+            return "break"
+            
+        # Select all group items
+        self.tree.selection_set(group_items)
+        
+        # Trigger the selection event to load all images
+        self.on_tree_select(None)
+        
+        # Prevent default handling of Ctrl+A
+        return "break"
+        
     def select_all_groups(self):
         """Smart select: when images are displayed, selects only duplicates (keeps originals unchecked)"""
         # If there are image checkboxes visible, use smart selection
@@ -742,7 +845,11 @@ class DuplicateImageIdentifierApp:
             # Clear current selection
             self.tree.selection_remove(self.tree.selection())
             
-            # Select all items in the tree
+            # Select all top-level items in the tree
+            group_items = self.tree.get_children()
+            if group_items:
+                self.tree.selection_set(group_items)
+                self.on_tree_select(None)
             all_items = self.tree.get_children()
             for item in all_items:
                 self.tree.selection_add(item)
