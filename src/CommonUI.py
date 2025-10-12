@@ -387,11 +387,18 @@ class ImageUtils:
     @staticmethod
     def open_full_image(parent_window, img_path):
         """
-        Open an image in a reusable window at full size
+        Open an image in a reusable window at full size with detailed information
         
         This function reuses the same window for viewing images to prevent
         multiple image windows from accumulating. If a window is already open,
         it will be reused and updated with the new image content.
+        
+        Displays comprehensive image information including:
+        - Full file path
+        - File size
+        - Image dimensions
+        - Format and color mode
+        - EXIF data (if available)
         
         Args:
             parent_window: The parent tkinter window
@@ -427,26 +434,155 @@ class ImageUtils:
             top.lift()
             top.focus_set()
             
+            # Get colors for styling
+            colors = ModernColors.get_color_scheme()
+            
+            # Create main container with info panel at top
+            main_container = tk.Frame(top, bg=colors['bg_primary'])
+            main_container.pack(fill=tk.BOTH, expand=True)
+            
+            # Info panel at top
+            info_panel = tk.Frame(main_container, bg=colors['bg_secondary'], height=60)
+            info_panel.pack(fill=tk.X, side=tk.TOP)
+            info_panel.pack_propagate(False)
+            
             # Load and display image
             img = Image.open(img_path)
+            
+            # Gather file information
+            file_size = os.path.getsize(img_path)
+            file_size_mb = file_size / (1024 * 1024)
+            file_size_str = f"{file_size_mb:.2f} MB" if file_size_mb >= 1 else f"{file_size / 1024:.2f} KB"
+            
+            # Create info text with file details
+            info_lines = []
+            info_lines.append(f"📁 Path: {img_path}")
+            info_lines.append(f"📏 Size: {img.width} × {img.height} pixels  |  💾 File: {file_size_str}  |  🎨 Format: {img.format}  |  Mode: {img.mode}")
+            
+            # Extract EXIF data if available
+            exif_data = {}
+            try:
+                exif = img._getexif()
+                if exif:
+                    from PIL.ExifTags import TAGS, GPSTAGS
+                    
+                    # Map EXIF tag IDs to names
+                    for tag_id, value in exif.items():
+                        tag_name = TAGS.get(tag_id, tag_id)
+                        exif_data[tag_name] = value
+                    
+                    # Build EXIF info line
+                    exif_parts = []
+                    
+                    # Camera make and model
+                    if 'Make' in exif_data and 'Model' in exif_data:
+                        camera = f"{exif_data['Make']} {exif_data['Model']}".strip()
+                        exif_parts.append(f"📷 {camera}")
+                    elif 'Model' in exif_data:
+                        exif_parts.append(f"📷 {exif_data['Model']}")
+                    
+                    # Date taken
+                    if 'DateTimeOriginal' in exif_data:
+                        exif_parts.append(f"📅 {exif_data['DateTimeOriginal']}")
+                    elif 'DateTime' in exif_data:
+                        exif_parts.append(f"📅 {exif_data['DateTime']}")
+                    
+                    # Exposure settings
+                    exposure_parts = []
+                    if 'FNumber' in exif_data:
+                        f_num = exif_data['FNumber']
+                        if isinstance(f_num, tuple):
+                            f_val = f_num[0] / f_num[1] if f_num[1] != 0 else f_num[0]
+                        else:
+                            f_val = f_num
+                        exposure_parts.append(f"f/{f_val:.1f}")
+                    
+                    if 'ExposureTime' in exif_data:
+                        exp_time = exif_data['ExposureTime']
+                        if isinstance(exp_time, tuple):
+                            exp_str = f"{exp_time[0]}/{exp_time[1]}s" if exp_time[1] != 1 else f"{exp_time[0]}s"
+                        else:
+                            exp_str = f"{exp_time}s"
+                        exposure_parts.append(exp_str)
+                    
+                    if 'ISOSpeedRatings' in exif_data:
+                        exposure_parts.append(f"ISO {exif_data['ISOSpeedRatings']}")
+                    
+                    if 'FocalLength' in exif_data:
+                        focal = exif_data['FocalLength']
+                        if isinstance(focal, tuple):
+                            focal_val = focal[0] / focal[1] if focal[1] != 0 else focal[0]
+                        else:
+                            focal_val = focal
+                        exposure_parts.append(f"{focal_val:.0f}mm")
+                    
+                    if exposure_parts:
+                        exif_parts.append("  |  ".join(exposure_parts))
+                    
+                    # GPS location
+                    if 'GPSInfo' in exif_data:
+                        exif_parts.append("📍 GPS Data Available")
+                    
+                    if exif_parts:
+                        info_lines.append("  |  ".join(exif_parts))
+                        
+            except (AttributeError, KeyError, IndexError, TypeError):
+                # No EXIF data or error reading it
+                pass
+            
+            # Display info in panel
+            info_text = tk.Text(info_panel, 
+                              height=len(info_lines),
+                              bg=colors['bg_secondary'],
+                              fg=colors['text_primary'],
+                              font=("Consolas", 9),
+                              wrap=tk.WORD,
+                              bd=0,
+                              padx=15,
+                              pady=10,
+                              relief=tk.FLAT,
+                              cursor="arrow")
+            info_text.pack(fill=tk.BOTH, expand=True)
+            
+            # Insert info text
+            for line in info_lines:
+                info_text.insert(tk.END, line + "\n")
+            
+            info_text.config(state=tk.DISABLED)  # Make read-only
+            
+            # Add selection and copy capability
+            def copy_path_to_clipboard(event=None):
+                top.clipboard_clear()
+                top.clipboard_append(img_path)
+                # Brief visual feedback
+                info_text.config(bg=colors['accent'])
+                top.after(200, lambda: info_text.config(bg=colors['bg_secondary']))
+            
+            info_text.bind('<Control-c>', copy_path_to_clipboard)
+            
+            # Add tooltip
+            ToolTip(info_text, "Ctrl+C to copy file path to clipboard")
+            # Add tooltip
+            ToolTip(info_text, "Ctrl+C to copy file path to clipboard")
             
             # Get screen dimensions to limit image size if needed
             screen_width = top.winfo_screenwidth()
             screen_height = top.winfo_screenheight()
             
-            # Calculate max size (90% of screen)
+            # Calculate max size (90% of screen, accounting for info panel)
             max_width = int(screen_width * 0.9)
-            max_height = int(screen_height * 0.9)
+            max_height = int(screen_height * 0.9) - 120  # Reserve space for info panel
             
             # Resize if image is too large for screen
-            if img.width > max_width or img.height > max_height:
-                img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            display_img = img.copy()
+            if display_img.width > max_width or display_img.height > max_height:
+                display_img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
             
-            img_tk = ImageTk.PhotoImage(img)
+            img_tk = ImageTk.PhotoImage(display_img)
             
             # Create scrollable frame for large images
-            frame = tk.Frame(top)
-            frame.pack(fill=tk.BOTH, expand=True)
+            frame = tk.Frame(main_container, bg='black')
+            frame.pack(fill=tk.BOTH, expand=True, side=tk.BOTTOM)
             
             canvas = tk.Canvas(frame, bg='black')
             v_scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL, command=canvas.yview)
@@ -471,8 +607,8 @@ class ImageUtils:
             canvas.configure(scrollregion=canvas.bbox("all"))
             
             # Center the window
-            window_width = min(img.width + 50, max_width)
-            window_height = min(img.height + 100, max_height)
+            window_width = min(display_img.width + 50, max_width)
+            window_height = min(display_img.height + 170, int(screen_height * 0.9))  # Account for info panel
             
             x = (screen_width - window_width) // 2
             y = (screen_height - window_height) // 2
@@ -490,6 +626,14 @@ class ImageUtils:
             
             top.bind('<Escape>', on_escape)
             top.bind('<space>', on_space)
+            
+            # Double-click to close window
+            def on_double_click(event):
+                ImageUtils._current_image_window = None
+                top.destroy()
+            
+            lbl.bind('<Double-Button-1>', on_double_click)
+            canvas.bind('<Double-Button-1>', on_double_click)
             
             # Mouse wheel scrolling
             def on_mousewheel(event):
