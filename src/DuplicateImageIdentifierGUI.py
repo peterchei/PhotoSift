@@ -34,9 +34,9 @@ class DuplicateImageIdentifierApp:
         self.max_thumb_size = (300, 225)  # Maximum size
         
         # Paging variables
-        self.page_size = 50  # images per page
+        self.page_size = 10  # groups per page (changed from images to groups)
         self.current_page = 0
-        self.current_display_images = []  # Store current images being displayed for paging
+        self.current_display_groups = []  # Store current groups being displayed for paging (changed from images)
         
         # Image caching system for performance
         self.image_cache = {}  # cache_key -> ImageTk.PhotoImage
@@ -625,7 +625,7 @@ class DuplicateImageIdentifierApp:
             self._tree_select_processing = False
     
     def display_groups(self, selected_items, force_page=False):
-        """Unified method to display images from single or multiple selected groups with paging support"""
+        """Unified method to display images from single or multiple selected groups with group-based paging support"""
         import time
         start_time = time.perf_counter()
         print(f"[DEBUG] display_groups: Starting with {len(selected_items)} selected items")
@@ -635,9 +635,9 @@ class DuplicateImageIdentifierApp:
         # Choose appropriate thumbnail size and layout
         thumb_size = self.thumb_size if is_single_group else self.multi_thumb_size
         
-        # Collect all images from selected groups
+        # Collect all groups with their images from selected items
         if not force_page:
-            self.current_display_images = []  # Reset the list
+            self.current_display_groups = []  # Reset the list - now stores groups instead of individual images
             self.current_page = 0  # Reset to first page
             
             for item_id in selected_items:
@@ -658,84 +658,79 @@ class DuplicateImageIdentifierApp:
                     child_item = self.tree.item(child)
                     if 'values' in child_item and child_item['values']:
                         img_path = child_item['values'][0]
-                        group_images.append((group_name, img_path))
+                        group_images.append(img_path)
                 
-                # Add all images from this group
-                self.current_display_images.extend(group_images)
+                # Store the entire group as one unit
+                if group_images:
+                    self.current_display_groups.append({
+                        'name': group_name,
+                        'images': group_images
+                    })
         
-        # Calculate page slice
+        # Calculate page slice - now paginating by groups, not images
         start_idx = self.current_page * self.page_size
-        end_idx = min(start_idx + self.page_size, len(self.current_display_images))
-        page_images = self.current_display_images[start_idx:end_idx]
+        end_idx = min(start_idx + self.page_size, len(self.current_display_groups))
+        page_groups = self.current_display_groups[start_idx:end_idx]
         
         # Update pagination controls
         self.update_page_controls()
         
-        # Now display the current page
+        # Now display the groups on current page
         current_row = 0
         total_images = 0
         
-        # Track current group for header display
-        current_group_name = None
-        group_images = []
-        
-        for group_name, img_path in page_images:
-            # Check if we need to display a new group header
-            if group_name != current_group_name:
-                # Display previous group's images if any
-                if group_images:
-                    if is_single_group:
-                        self.display_images_in_grid(group_images, current_row)
-                    else:
-                        self.display_images_in_row(group_images, current_row)
-                    total_images += len(group_images)
-                    current_row += 1
-                    group_images = []
-                
-                # Create new group header (only for multiple groups or when showing headers)
-                show_header = not is_single_group or len(self.current_display_images) > 1
-                if show_header:
-                    group_header = tk.Frame(self.img_panel, bg=self.colors['bg_secondary'], height=40)
-                    group_header.grid(row=current_row, column=0, columnspan=10, sticky='ew', padx=5, pady=(5, 0))
-                    group_header.grid_propagate(False)
-                    
-                    header_label = tk.Label(group_header, 
-                                           text=f"📂 {group_name}", 
-                                           font=("Segoe UI", 12, "bold"),
-                                           bg=self.colors['bg_secondary'],
-                                           fg=self.colors['text_primary'])
-                    header_label.pack(side=tk.LEFT, padx=10, pady=8)
-                    
-                    current_row += 1
-                
-                current_group_name = group_name
+        for group_data in page_groups:
+            group_name = group_data['name']
+            img_paths = group_data['images']
             
-            # Use cached thumbnail for much faster loading
-            img_tk = self.get_cached_thumbnail(img_path, thumb_size)
-            if img_tk:
-                group_images.append((img_tk, img_path))
-        
-        # Display the last group's images
-        if group_images:
-            if is_single_group:
-                self.display_images_in_grid(group_images, current_row)
-            else:
-                self.display_images_in_row(group_images, current_row)
-            total_images += len(group_images)
+            # Create group header (only for multiple groups or when showing headers)
+            show_header = not is_single_group or len(self.current_display_groups) > 1
+            if show_header:
+                group_header = tk.Frame(self.img_panel, bg=self.colors['bg_secondary'], height=40)
+                group_header.grid(row=current_row, column=0, columnspan=10, sticky='ew', padx=5, pady=(5, 0))
+                group_header.grid_propagate(False)
+                
+                header_label = tk.Label(group_header, 
+                                       text=f"📂 {group_name}", 
+                                       font=("Segoe UI", 12, "bold"),
+                                       bg=self.colors['bg_secondary'],
+                                       fg=self.colors['text_primary'])
+                header_label.pack(side=tk.LEFT, padx=10, pady=8)
+                
+                current_row += 1
+            
+            # Load thumbnails for this group
+            group_images = []
+            for img_path in img_paths:
+                img_tk = self.get_cached_thumbnail(img_path, thumb_size)
+                if img_tk:
+                    group_images.append((img_tk, img_path))
+            
+            # Display images with appropriate layout
+            if group_images:
+                if is_single_group:
+                    # Grid layout for single group (better space utilization)
+                    self.display_images_in_grid(group_images, current_row)
+                else:
+                    # Row layout for multiple groups
+                    self.display_images_in_row(group_images, current_row)
+                
+                total_images += len(group_images)
+                current_row += 1
         
         # Update status
         step_start = time.perf_counter()
-        total_all_images = len(self.current_display_images)
+        total_all_groups = len(self.current_display_groups)
+        total_all_images = sum(len(g['images']) for g in self.current_display_groups)
+        
         if is_single_group:
-            if total_all_images > self.page_size:
-                self.status_bar.set_text(f"Viewing duplicate group - Page {self.current_page + 1} ({total_images} of {total_all_images} images)")
-            else:
-                self.status_bar.set_text(f"Viewing duplicate group with {total_all_images} images")
+            self.status_bar.set_text(f"Viewing duplicate group with {total_all_images} images")
         else:
-            if total_all_images > self.page_size:
-                self.status_bar.set_text(f"Page {self.current_page + 1} - {total_images} of {total_all_images} images")
+            if total_all_groups > self.page_size:
+                displayed_groups = len(page_groups)
+                self.status_bar.set_text(f"Page {self.current_page + 1} - Showing {displayed_groups} of {total_all_groups} groups ({total_images} of {total_all_images} images)")
             else:
-                self.status_bar.set_text(f"Viewing {len(selected_items)} groups with {total_all_images} images")
+                self.status_bar.set_text(f"Viewing {total_all_groups} groups with {total_all_images} images")
         print(f"[DEBUG] display_groups: Updated status bar - {time.perf_counter() - step_start:.3f}s")
         
         total_time = time.perf_counter() - start_time
@@ -909,12 +904,12 @@ class DuplicateImageIdentifierApp:
         self.zoom_controls.update_controls(can_zoom_in, can_zoom_out, zoom_level)
     
     def next_page(self):
-        """Navigate to the next page of images"""
-        if not self.current_display_images:
+        """Navigate to the next page of groups"""
+        if not self.current_display_groups:
             return
         
         next_page = self.current_page + 1
-        if next_page * self.page_size < len(self.current_display_images):
+        if next_page * self.page_size < len(self.current_display_groups):
             self.current_page = next_page
             # Disable buttons during update to prevent rapid clicks
             self.prev_page_btn.config(state=tk.DISABLED)
@@ -934,8 +929,8 @@ class DuplicateImageIdentifierApp:
             self.update_clean_button_count()
     
     def prev_page(self):
-        """Navigate to the previous page of images"""
-        if not self.current_display_images:
+        """Navigate to the previous page of groups"""
+        if not self.current_display_groups:
             return
             
         if self.current_page > 0:
@@ -959,15 +954,15 @@ class DuplicateImageIdentifierApp:
     
     def update_page_controls(self):
         """Update pagination control states and labels"""
-        if not self.current_display_images or len(self.current_display_images) == 0:
+        if not self.current_display_groups or len(self.current_display_groups) == 0:
             self.page_label.config(text="Page 0 of 0")
             self.prev_page_btn.config(state=tk.DISABLED)
             self.next_page_btn.config(state=tk.DISABLED)
-            self.page_frame.pack_forget()  # Hide when no images
+            self.page_frame.pack_forget()  # Hide when no groups
             return
         
         # Show pagination controls only if there are multiple pages
-        total_pages = max(1, (len(self.current_display_images) - 1) // self.page_size + 1)
+        total_pages = max(1, (len(self.current_display_groups) - 1) // self.page_size + 1)
         
         if total_pages > 1:
             self.page_frame.pack(fill=tk.X, pady=(0, 20))
@@ -975,7 +970,7 @@ class DuplicateImageIdentifierApp:
             
             # Update button states
             self.prev_page_btn.config(state=tk.NORMAL if self.current_page > 0 else tk.DISABLED)
-            next_enabled = (self.current_page + 1) * self.page_size < len(self.current_display_images)
+            next_enabled = (self.current_page + 1) * self.page_size < len(self.current_display_groups)
             self.next_page_btn.config(state=tk.NORMAL if next_enabled else tk.DISABLED)
         else:
             self.page_frame.pack_forget()  # Hide pagination for single page

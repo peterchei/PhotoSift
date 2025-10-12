@@ -607,7 +607,7 @@ class ImageUtils:
             canvas.configure(scrollregion=canvas.bbox("all"))
             
             # Center the window
-            window_width = min(display_img.width + 50, max_width)
+            window_width = min(display_img.width, max_width)
             window_height = min(display_img.height + 170, int(screen_height * 0.9))  # Account for info panel
             
             x = (screen_width - window_width) // 2
