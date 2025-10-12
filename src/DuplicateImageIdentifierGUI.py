@@ -190,9 +190,19 @@ class DuplicateImageIdentifierApp:
         action_frame.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Action buttons using ModernButton factory
+        # Select All button with variable text that updates based on state
+        self.select_all_btn_var = tk.StringVar()
+        self.select_all_btn_var.set("Select All")
         self.select_all_btn = ModernButton.create_primary_button(
-            action_frame, "Select All", self.select_all_groups, self.colors)
+            action_frame, "", self.select_all_groups, self.colors,
+            textvariable=self.select_all_btn_var)
         self.select_all_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Add tooltip to Select All button
+        ToolTip(self.select_all_btn, 
+                "Toggle selection of duplicates in displayed images.\n"
+                "Keeps first image in each group unchecked (as original).\n"
+                "Click again to unselect all duplicates.")
         
         # Clean button with variable text
         self.clean_btn_var = tk.StringVar()
@@ -201,6 +211,12 @@ class DuplicateImageIdentifierApp:
             action_frame, "", self.clean_selected_images, self.colors, 
             textvariable=self.clean_btn_var)
         self.clean_btn.pack(side=tk.LEFT)
+        
+        # Add tooltip to Clean button
+        ToolTip(self.clean_btn, 
+                "Move selected images to Trash folder.\n"
+                "Check images you want to remove, then click Clean.\n"
+                "Images will be moved to a local Trash folder for safety.")
         
         # Modern pagination controls
         self.page_frame = tk.Frame(main_area, bg=self.colors['bg_primary'], height=50)
@@ -613,6 +629,9 @@ class DuplicateImageIdentifierApp:
             self.update_clean_button_count()
             print(f"[DEBUG] on_tree_select: Updated clean button count - {time.perf_counter() - step_start:.3f}s")
             
+            # Update Select All button text
+            self.update_select_all_button_text()
+            
             # Update scroll region
             step_start = time.perf_counter()
             self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
@@ -927,6 +946,7 @@ class DuplicateImageIdentifierApp:
             # Update scroll region
             self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
             self.update_clean_button_count()
+            self.update_select_all_button_text()
     
     def prev_page(self):
         """Navigate to the previous page of groups"""
@@ -951,6 +971,7 @@ class DuplicateImageIdentifierApp:
             # Update scroll region
             self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
             self.update_clean_button_count()
+            self.update_select_all_button_text()
     
     def update_page_controls(self):
         """Update pagination control states and labels"""
@@ -1194,6 +1215,35 @@ class DuplicateImageIdentifierApp:
             
         self.clean_btn_var.set(f"Clean ({selected_count})")
     
+    def update_select_all_button_text(self):
+        """Update the Select All button text based on current selection state"""
+        if not hasattr(self, 'select_all_btn_var'):
+            return
+        
+        # Check if any images are displayed
+        if not self.selected_check_vars:
+            self.select_all_btn_var.set("Select All")
+            return
+        
+        # Create a set of first images (ones to keep) from all groups
+        first_images = set()
+        if hasattr(self, 'groups') and self.groups:
+            for group in self.groups:
+                if group:  # Make sure group is not empty
+                    first_images.add(group[0])  # First image in each group
+        
+        # Check if any duplicates are currently selected (excluding first images)
+        duplicates_selected = any(
+            item[0].get() for item in self.selected_check_vars 
+            if len(item) >= 2 and item[1] not in first_images
+        )
+        
+        # Update button text based on state
+        if duplicates_selected:
+            self.select_all_btn_var.set("Unselect All")
+        else:
+            self.select_all_btn_var.set("Select All")
+    
     def on_image_check(self, var, img_path):
         """Handle individual image checkbox selection"""
         # Skip update if we're doing bulk selection to prevent performance issues
@@ -1208,6 +1258,9 @@ class DuplicateImageIdentifierApp:
                            if len(item) >= 2 and item[0].get())
         if hasattr(self, 'clean_btn_var'):
             self.clean_btn_var.set(f"Clean ({selected_count})")
+        
+        # Update Select All button text
+        self.update_select_all_button_text()
     
     def count_selected_images(self):
         """Count how many images are currently selected via checkboxes"""
@@ -1265,6 +1318,13 @@ class DuplicateImageIdentifierApp:
         selected_count = self.count_selected_images()
         if hasattr(self, 'clean_btn_var'):
             self.clean_btn_var.set(f"Clean ({selected_count})")
+        
+        # Update Select All button text based on new state
+        if hasattr(self, 'select_all_btn_var'):
+            if new_state:
+                self.select_all_btn_var.set("Unselect All")
+            else:
+                self.select_all_btn_var.set("Select All")
     
     def refresh_after_clean(self, cleaned_paths):
         """Efficiently refresh UI after cleaning images"""
@@ -1407,6 +1467,7 @@ class DuplicateImageIdentifierApp:
                             # Display the selected groups
                             self.display_groups(selected)
                             self.update_clean_button_count()
+                            self.update_select_all_button_text()
                             self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
                         
                         print(f"[DEBUG] Step 10b: Trigger display (direct call) - {time.perf_counter() - step_start:.3f}s")
@@ -1433,16 +1494,21 @@ class DuplicateImageIdentifierApp:
                     self.trash_manager.update_trash_count()
                     print(f"[DEBUG] Step 13: Update trash count - {time.perf_counter() - step_start:.3f}s")
                     
+                    # Update duplications label
+                    step_start = time.perf_counter()
+                    self.update_duplications_label()
+                    print(f"[DEBUG] Step 14: Update duplications label - {time.perf_counter() - step_start:.3f}s")
+                    
                     # Update status
                     step_start = time.perf_counter()
                     if hasattr(self, 'status_bar'):
                         self.status_bar.set_text(f"Cleaned images. {len(self.groups)} duplicate groups remaining.")
-                    print(f"[DEBUG] Step 14: Update status bar - {time.perf_counter() - step_start:.3f}s")
+                    print(f"[DEBUG] Step 15: Update status bar - {time.perf_counter() - step_start:.3f}s")
 
             # Show modern completion popup - TEMPORARILY DISABLED FOR DEBUGGING
             step_start = time.perf_counter()
             # self.show_clean_completion_popup()  # DISABLED
-            print(f"[DEBUG] Step 15: Show completion popup (SKIPPED) - {time.perf_counter() - step_start:.3f}s")
+            print(f"[DEBUG] Step 16: Show completion popup (SKIPPED) - {time.perf_counter() - step_start:.3f}s")
             
             total_time = time.perf_counter() - start_time
             print(f"[DEBUG] refresh_after_clean COMPLETE - Total time: {total_time:.3f}s")
