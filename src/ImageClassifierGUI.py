@@ -516,8 +516,10 @@ class ImageClassifierApp:
         action_frame.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Modern Select All button
+        self.select_all_btn_var = tk.StringVar()
+        self.select_all_btn_var.set("Select All")
         self.select_all_btn = tk.Button(action_frame, 
-                                       text="Select All", 
+                                       textvariable=self.select_all_btn_var, 
                                        command=self.select_all_photos,
                                        font=("Segoe UI", 12, "bold"),
                                        bg=self.colors['accent'],
@@ -526,6 +528,10 @@ class ImageClassifierApp:
                                        bd=0, relief=tk.FLAT, cursor="hand2",
                                        padx=16, pady=8)
         self.select_all_btn.pack(side=tk.LEFT, padx=(0, 10))
+        ToolTip(self.select_all_btn, 
+                "Toggle selection of all photos\n"
+                "Selects all photos if any are unselected\n"
+                "Unselects all photos if all are selected")
         
         # Modern Clean button
         self.clean_btn_var = tk.StringVar()
@@ -540,6 +546,10 @@ class ImageClassifierApp:
                                   bd=0, relief=tk.FLAT, cursor="hand2",
                                   padx=16, pady=8)
         self.clean_btn.pack(side=tk.LEFT)
+        ToolTip(self.clean_btn, 
+                "Clean selected photos from the list\n"
+                "Selected photos will be moved to trash\n"
+                "Can be restored from system trash if needed")
         
         # Main content area
         self.right_frame = tk.Frame(main_area, bg=self.colors['bg_primary'])
@@ -1184,10 +1194,22 @@ class ImageClassifierApp:
     def count_selected_photos(self):
         return sum(var.get() for var, _ in self.selected_check_vars)
 
+    def update_select_all_button_text(self):
+        """Update Select All button text based on current selection state"""
+        if not hasattr(self, 'selected_check_vars') or not self.selected_check_vars:
+            self.select_all_btn_var.set("Select All")
+            return
+        
+        # Check if all photos are selected
+        all_selected = all(var.get() for var, _ in self.selected_check_vars)
+        self.select_all_btn_var.set("Unselect All" if all_selected else "Select All")
+
     def update_clean_btn_label(self, count):
         # Skip update during cleaning to prevent flicker
         if not getattr(self, '_cleaning_in_progress', False):
             self.clean_btn_var.set(f"Clean ({count})")
+        # Update Select All button text whenever clean button is updated
+        self.update_select_all_button_text()
 
     def clean_selected_photos(self):
         # Prevent concurrent cleaning operations
