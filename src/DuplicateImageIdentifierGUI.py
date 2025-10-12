@@ -25,6 +25,7 @@ class DuplicateImageIdentifierApp:
         self.similarity_scores = {}  # path -> similarity score for duplicates
         self._updating_bulk_selection = False  # Flag to prevent callback loops during bulk operations
         self._cleaning_in_progress = False  # Flag to prevent UI updates during cleaning
+        self._refresh_in_progress = False  # Flag to prevent recursive tree selection during refresh
         
         # Thumbnail size configuration for zoom functionality
         self.thumb_size = (180, 135)  # Default size for single group view
@@ -525,28 +526,74 @@ class DuplicateImageIdentifierApp:
         self.update_duplications_label()
 
     def on_tree_select(self, event):
-        selected = self.tree.selection()
-        if not selected:
-            # Update clean button count for empty selection
-            self.update_clean_button_count()
+        # Prevent recursive calls during refresh operations
+        if getattr(self, '_refresh_in_progress', False):
+            print(f"[DEBUG] on_tree_select: SKIPPED - refresh in progress")
+            return
+            
+        # Prevent rapid-fire calls by tracking last call time
+        import time
+        current_time = time.perf_counter()
+        if hasattr(self, '_last_tree_select_time'):
+            if current_time - self._last_tree_select_time < 0.1:  # 100ms minimum between calls
+                print(f"[DEBUG] on_tree_select: SKIPPED - too frequent (last call {current_time - self._last_tree_select_time:.3f}s ago)")
+                return
+        self._last_tree_select_time = current_time
+            
+        # Add a processing flag to prevent overlapping calls
+        if getattr(self, '_tree_select_processing', False):
+            print(f"[DEBUG] on_tree_select: SKIPPED - already processing")
             return
         
-        # Clear previous images and selection tracking
-        for widget in self.img_panel.winfo_children():
-            widget.destroy()
-        self.selected_check_vars.clear()  # Clear checkbox tracking
+        self._tree_select_processing = True
         
-        # Handle both single and multiple selection with unified method
-        self.display_groups(selected)
+        try:
+            start_time = time.perf_counter()
+            print(f"[DEBUG] on_tree_select: Starting")
         
-        # Update clean button count
-        self.update_clean_button_count()
+            selected = self.tree.selection()
+            if not selected:
+                # Update clean button count for empty selection
+                self.update_clean_button_count()
+                print(f"[DEBUG] on_tree_select: No selection - {time.perf_counter() - start_time:.3f}s")
+                return
         
-        # Update scroll region
-        self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
+            # Clear previous images and selection tracking
+            step_start = time.perf_counter()
+            widgets_to_destroy = self.img_panel.winfo_children()
+            for widget in widgets_to_destroy:
+                widget.destroy()
+            self.selected_check_vars.clear()  # Clear checkbox tracking
+            print(f"[DEBUG] on_tree_select: Cleared {len(widgets_to_destroy)} widgets - {time.perf_counter() - step_start:.3f}s")
+            
+            # Handle both single and multiple selection with unified method
+            step_start = time.perf_counter()
+            print(f"[DEBUG] on_tree_select: About to call display_groups with {len(selected)} items")
+            self.display_groups(selected)
+            print(f"[DEBUG] on_tree_select: display_groups completed - {time.perf_counter() - step_start:.3f}s")
+            
+            # Update clean button count
+            step_start = time.perf_counter()
+            self.update_clean_button_count()
+            print(f"[DEBUG] on_tree_select: Updated clean button count - {time.perf_counter() - step_start:.3f}s")
+            
+            # Update scroll region
+            step_start = time.perf_counter()
+            self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
+            print(f"[DEBUG] on_tree_select: Scheduled scroll update - {time.perf_counter() - step_start:.3f}s")
+        
+            total_time = time.perf_counter() - start_time
+            print(f"[DEBUG] on_tree_select: COMPLETE - Total time: {total_time:.3f}s")
+        
+        finally:
+            self._tree_select_processing = False
     
     def display_groups(self, selected_items):
         """Unified method to display images from single or multiple selected groups"""
+        import time
+        start_time = time.perf_counter()
+        print(f"[DEBUG] display_groups: Starting with {len(selected_items)} selected items")
+        
         total_images = 0
         current_row = 0
         is_single_group = len(selected_items) == 1
@@ -609,10 +656,15 @@ class DuplicateImageIdentifierApp:
                 current_row += 1
         
         # Update status
+        step_start = time.perf_counter()
         if is_single_group:
             self.status_bar.set_text(f"Viewing duplicate group with {total_images} images")
         else:
             self.status_bar.set_text(f"Viewing {len(selected_items)} groups with {total_images} images")
+        print(f"[DEBUG] display_groups: Updated status bar - {time.perf_counter() - step_start:.3f}s")
+        
+        total_time = time.perf_counter() - start_time
+        print(f"[DEBUG] display_groups: COMPLETE - Total images: {total_images}, Total time: {total_time:.3f}s")
     
     def display_images_in_grid(self, group_images, start_row):
         """Display images in a grid layout (for single group selection)"""
@@ -880,18 +932,10 @@ class DuplicateImageIdentifierApp:
                 if not images_to_clean:
                     messagebox.showinfo("No Selection", "Please select images using checkboxes to clean.")
                     return
-                
-                # Confirm cleaning action
-                result = messagebox.askyesno(
-                    "Confirm Clean", 
-                    f"Move {len(images_to_clean)} selected images to trash?\n\nThis action cannot be undone.",
-                    icon='warning'
-                )
-                
-                if result:
-                    self.move_images_to_trash(images_to_clean)
-                    # Refresh the display
-                    self.refresh_after_clean(images_to_clean)
+
+                self.move_images_to_trash(images_to_clean)
+                # Refresh the display
+                self.refresh_after_clean(images_to_clean)
             else:
                 # Fallback to tree selection method
                 selected_items = self.tree.selection() if self.tree else []
@@ -1082,21 +1126,35 @@ class DuplicateImageIdentifierApp:
     
     def refresh_after_clean(self, cleaned_paths):
         """Efficiently refresh UI after cleaning images"""
+        import time
+        start_time = time.perf_counter()
+        print(f"[DEBUG] refresh_after_clean started - {len(cleaned_paths)} paths to clean")
+        
+        # Set refresh flag to prevent recursive tree selection events
+        self._refresh_in_progress = True
+        
         try:
             # Store current selection and expansion state to restore later
+            step_start = time.perf_counter()
             current_selection = []
             expansion_state = {}  # group_index -> expanded (True/False)
+            print(f"[DEBUG] Step 1: Initialize variables - {time.perf_counter() - step_start:.3f}s")
             
             if hasattr(self, 'tree') and self.tree:
+                step_start = time.perf_counter()
                 current_selection = self.tree.selection()
                 selected_group_indices = []
+                print(f"[DEBUG] Step 2: Get current selection ({len(current_selection)} items) - {time.perf_counter() - step_start:.3f}s")
                 
                 # Store expansion state of all group nodes
+                step_start = time.perf_counter()
                 siblings = self.tree.get_children("")
                 for i, group_item in enumerate(siblings):
                     expansion_state[i] = self.tree.item(group_item, 'open')
+                print(f"[DEBUG] Step 3: Store expansion state ({len(siblings)} groups) - {time.perf_counter() - step_start:.3f}s")
                 
                 # Map current selections to group indices
+                step_start = time.perf_counter()
                 for selected_item in current_selection:
                     parent = self.tree.parent(selected_item)
                     if parent == "":  # This is a group node
@@ -1107,9 +1165,13 @@ class DuplicateImageIdentifierApp:
                         # This is an image node, get parent group index
                         group_index = siblings.index(parent)
                         selected_group_indices.append(group_index)
+                print(f"[DEBUG] Step 4: Map selections to indices ({len(selected_group_indices)} mapped) - {time.perf_counter() - step_start:.3f}s")
                 
             # Remove cleaned images from groups and update tree
             if hasattr(self, 'groups') and self.groups:
+                step_start = time.perf_counter()
+                print(f"[DEBUG] Step 5: Starting group cleanup - {len(self.groups)} original groups")
+                
                 # Remove cleaned images from groups
                 updated_groups = []
                 group_mapping = []  # Track which old groups correspond to new groups
@@ -1124,14 +1186,20 @@ class DuplicateImageIdentifierApp:
                 
                 # Update groups and rebuild tree with proper naming
                 self.groups = updated_groups
+                print(f"[DEBUG] Step 5: Group cleanup complete - {len(updated_groups)} groups remain - {time.perf_counter() - step_start:.3f}s")
                 
                 # Clear and rebuild tree
                 if self.tree:
-                    for item in self.tree.get_children():
+                    step_start = time.perf_counter()
+                    old_children = self.tree.get_children()
+                    for item in old_children:
                         self.tree.delete(item)
+                    print(f"[DEBUG] Step 6: Clear old tree ({len(old_children)} items) - {time.perf_counter() - step_start:.3f}s")
                     
                     # Rebuild tree with original naming scheme
+                    step_start = time.perf_counter()
                     new_group_nodes = []
+                    total_images = 0
                     for i, group in enumerate(self.groups):
                         # Use original naming scheme: first filename with duplicate count
                         first_filename = os.path.basename(group[0])
@@ -1144,8 +1212,12 @@ class DuplicateImageIdentifierApp:
                         for img_path in group:
                             filename = os.path.basename(img_path)
                             self.tree.insert(group_item, "end", text=f"🖼️ {filename}", values=(img_path,))
+                            total_images += 1
+                    print(f"[DEBUG] Step 7: Rebuild tree ({len(new_group_nodes)} groups, {total_images} images) - {time.perf_counter() - step_start:.3f}s")
                     
                     # Restore expansion state for all groups
+                    step_start = time.perf_counter()
+                    restored_count = 0
                     for new_index, group_item in enumerate(new_group_nodes):
                         # Find the corresponding old group index
                         if new_index < len(group_mapping):
@@ -1154,8 +1226,11 @@ class DuplicateImageIdentifierApp:
                             if old_group_index in expansion_state:
                                 was_expanded = expansion_state[old_group_index]
                                 self.tree.item(group_item, open=was_expanded)
+                                restored_count += 1
+                    print(f"[DEBUG] Step 8: Restore expansion state ({restored_count} restored) - {time.perf_counter() - step_start:.3f}s")
                     
                     # Restore selection based on group mapping
+                    step_start = time.perf_counter()
                     items_to_select = []
                     for old_group_index in selected_group_indices:
                         # Find if this old group still exists
@@ -1166,152 +1241,134 @@ class DuplicateImageIdentifierApp:
                         except ValueError:
                             # Old group was completely cleaned, skip
                             pass
+                    print(f"[DEBUG] Step 9: Map selection ({len(items_to_select)} items to select) - {time.perf_counter() - step_start:.3f}s")
                     
                     # If we have items to select, select them and trigger display
+                    step_start = time.perf_counter()
                     if items_to_select:
+                        # Simply restore selection - tree selection events are handled by flag
                         for item in items_to_select:
                             self.tree.selection_add(item)
                         
-                        # Trigger the selection event to show images
-                        self.on_tree_select(None)
+                        # Manually trigger display (bypassing event system entirely)
+                        print(f"[DEBUG] Step 10a: Restore selection - {time.perf_counter() - step_start:.3f}s")
+                        step_start = time.perf_counter()
+                        
+                        # Call display_groups directly instead of on_tree_select to avoid event loops
+                        selected = self.tree.selection()
+                        if selected:
+                            # Clear previous images
+                            widgets_to_destroy = self.img_panel.winfo_children()
+                            for widget in widgets_to_destroy:
+                                widget.destroy()
+                            self.selected_check_vars.clear()
+                            # Display the selected groups
+                            self.display_groups(selected)
+                            self.update_clean_button_count()
+                            self.root.after(10, lambda: self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all")))
+                        
+                        print(f"[DEBUG] Step 10b: Trigger display (direct call) - {time.perf_counter() - step_start:.3f}s")
                     else:
                         # No valid selection, clear image display
-                        for widget in self.img_panel.winfo_children():
+                        img_widgets = self.img_panel.winfo_children()
+                        for widget in img_widgets:
                             widget.destroy()
                         self.selected_check_vars.clear()
+                        print(f"[DEBUG] Step 10: Clear display ({len(img_widgets)} widgets cleared) - {time.perf_counter() - step_start:.3f}s")
                     
                     # Update scroll region
+                    step_start = time.perf_counter()
                     self.img_canvas.configure(scrollregion=self.img_canvas.bbox("all"))
+                    print(f"[DEBUG] Step 11: Update scroll region - {time.perf_counter() - step_start:.3f}s")
                     
                     # Update clean button count
+                    step_start = time.perf_counter()
                     self.update_clean_button_count()
+                    print(f"[DEBUG] Step 12: Update clean button count - {time.perf_counter() - step_start:.3f}s")
                     
                     # Update trash count
+                    step_start = time.perf_counter()
                     self.trash_manager.update_trash_count()
+                    print(f"[DEBUG] Step 13: Update trash count - {time.perf_counter() - step_start:.3f}s")
                     
                     # Update status
+                    step_start = time.perf_counter()
                     if hasattr(self, 'status_bar'):
                         self.status_bar.set_text(f"Cleaned images. {len(self.groups)} duplicate groups remaining.")
+                    print(f"[DEBUG] Step 14: Update status bar - {time.perf_counter() - step_start:.3f}s")
 
-            # Show modern completion popup
-            self.show_clean_completion_popup()
+            # Show modern completion popup - TEMPORARILY DISABLED FOR DEBUGGING
+            step_start = time.perf_counter()
+            # self.show_clean_completion_popup()  # DISABLED
+            print(f"[DEBUG] Step 15: Show completion popup (SKIPPED) - {time.perf_counter() - step_start:.3f}s")
+            
+            total_time = time.perf_counter() - start_time
+            print(f"[DEBUG] refresh_after_clean COMPLETE - Total time: {total_time:.3f}s")
             
         except Exception as e:
+            total_time = time.perf_counter() - start_time
+            print(f"[DEBUG] refresh_after_clean ERROR after {total_time:.3f}s: {e}")
             print(f"Error during refresh: {e}")
             # Fallback to simple message
             messagebox.showinfo("Clean Complete", "Images moved to trash. Please refresh manually if needed.")
+        
+        finally:
+            # Always clear the refresh flag
+            self._refresh_in_progress = False
+            print(f"[DEBUG] refresh_after_clean: Refresh flag cleared")
+            
+            # TEMPORARY FIX: Disable tree selection events for 2 seconds to prevent infinite loops
+            if hasattr(self, 'tree') and self.tree:
+                self.tree.unbind("<<TreeviewSelect>>")
+                print(f"[DEBUG] refresh_after_clean: Tree selection events DISABLED for 2 seconds")
+                
+                def re_enable_selection():
+                    if hasattr(self, 'tree') and self.tree:
+                        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+                        print(f"[DEBUG] refresh_after_clean: Tree selection events RE-ENABLED")
+                
+                self.root.after(2000, re_enable_selection)  # Re-enable after 2 seconds
 
     def show_clean_completion_popup(self):
-        """Show professional popup message for clean completion"""
+        """Show simple, fast completion message without blocking"""
+        import time
+        step_start = time.perf_counter()
+        print(f"[DEBUG] show_clean_completion_popup: Starting SIMPLIFIED popup creation")
+        
         try:
-            popup = tk.Toplevel()
-            popup.title("Operation Status")
-            
-            # Make the window float on top
-            popup.lift()
-            popup.attributes('-topmost', True)
-            
-            # Enhanced window setup
-            window_width = 380
-            window_height = 150
-            
-            # Get the position of the main window
-            main_window_x = self.root.winfo_x()
-            main_window_y = self.root.winfo_y()
-            main_window_width = self.root.winfo_width()
-            main_window_height = self.root.winfo_height()
-            
-            # Calculate position (centered on main window)
-            position_x = main_window_x + (main_window_width - window_width) // 2
-            position_y = main_window_y + (main_window_height - window_height) // 2
-            
-            # Set window geometry
-            popup.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
-            
-            # Configure window style
-            popup.configure(bg='#ffffff')
-            popup.overrideredirect(True)  # Remove window decorations
-            
-            # Create main container with border
-            border_frame = tk.Frame(popup, bg='#e2e8f0', padx=1, pady=1)
-            border_frame.pack(fill=tk.BOTH, expand=True)
-            
-            main_frame = tk.Frame(border_frame, bg='#ffffff')
-            main_frame.pack(fill=tk.BOTH, expand=True)
-            
-            # Header bar
-            header_frame = tk.Frame(main_frame, bg='#f8fafc', height=32)
-            header_frame.pack(fill=tk.X)
-            header_frame.pack_propagate(False)
-            
-            header_label = tk.Label(header_frame, text="Operation Complete",
-                                  bg='#f8fafc', fg='#334155',
-                                  font=("Segoe UI", 11, "bold"))
-            header_label.pack(side=tk.LEFT, padx=15, pady=6)
-            
-            # Content frame with padding
-            content_frame = tk.Frame(main_frame, bg='#ffffff', padx=20, pady=15)
-            content_frame.pack(fill=tk.BOTH, expand=True)
-            
             # Get clean results
             moved_count = getattr(self, '_last_clean_count', 0)
             failed_files = getattr(self, '_last_failed_files', [])
-            trash_dir = getattr(self, '_trash_dir', '')
             
-            # Status icon and colors
-            if failed_files:
-                icon = "⚠"
+            # Create simple message
+            if failed_files and len(failed_files) > 0:
                 title = "Partial Success"
-                icon_color = "#dc2626"  # Red
-                message = f"Moved {moved_count} images to Trash\n"
-                if len(failed_files) > 0:
-                    message += f"Failed to move {len(failed_files)} files"
+                message = f"Moved {moved_count} images to Trash\nFailed to move {len(failed_files)} files"
             else:
-                icon = "✓"
-                title = "Success"
-                icon_color = "#0369a1"  # Blue
+                title = "Clean Complete"
                 message = f"Successfully moved {moved_count} images to Trash"
-                if trash_dir:
-                    message += f"\nLocation: {trash_dir}"
             
-            # Icon
-            icon_label = tk.Label(content_frame, text=icon, bg='#ffffff',
-                                fg=icon_color, font=("Segoe UI", 24))
-            icon_label.pack(pady=(0, 5))
+            print(f"[DEBUG] show_clean_completion_popup: Using simple messagebox instead of complex popup")
             
-            # Title
-            title_label = tk.Label(content_frame, text=title, bg='#ffffff',
-                                 fg=icon_color, font=("Segoe UI", 12, "bold"))
-            title_label.pack(pady=(0, 8))
-            
-            # Message
-            msg_label = tk.Label(content_frame, text=message, bg='#ffffff',
-                               fg='#475569', font=("Segoe UI", 11))
-            msg_label.pack()
-            
-            # Force the window to update and show
-            popup.update()
-            
-            # Add subtle fade out before destruction
-            def fade_out():
+            # Use simple, reliable messagebox instead of complex custom popup
+            # This runs asynchronously and won't block
+            def show_async_message():
                 try:
-                    for i in range(10):
-                        opacity = 1.0 - (i / 10)
-                        popup.attributes('-alpha', opacity)
-                        popup.update()
-                        popup.after(50)
-                    popup.destroy()
-                except:
-                    pass  # Ignore errors during fade out
+                    messagebox.showinfo(title, message)
+                    print(f"[DEBUG] show_clean_completion_popup: Simple messagebox completed")
+                except Exception as e:
+                    print(f"[DEBUG] show_clean_completion_popup: Messagebox error: {e}")
             
-            # Schedule fade out and destruction
-            popup.after(1500, fade_out)
+            # Schedule the messagebox to appear after a short delay (non-blocking)
+            self.root.after(100, show_async_message)
+            
+            print(f"[DEBUG] show_clean_completion_popup: Simple popup scheduled - {time.perf_counter() - step_start:.3f}s")
             
         except Exception as e:
+            print(f"[DEBUG] show_clean_completion_popup: ERROR - {str(e)}")
             print(f"Error showing popup: {str(e)}")
-            # Fallback to simple message
-            moved_count = getattr(self, '_last_clean_count', 0)
-            messagebox.showinfo("Clean Complete", f"Successfully moved {moved_count} images to Trash")
+        
+        print(f"[DEBUG] show_clean_completion_popup: Method complete - {time.perf_counter() - step_start:.3f}s")
 
     def restore_checkbox_states(self, checkbox_states):
         """Restore checkbox states and cross overlays after refresh"""
