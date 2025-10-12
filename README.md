@@ -109,7 +109,33 @@ makeappx pack /d store_package /p PhotoSift.msix
 - **MSIX format** - Ready-to-submit Microsoft Store package
 - **Manifest configuration** - Properly configured AppxManifest.xml
 
-For detailed Microsoft Store submission instructions, see [`ms-store-submission.md`](ms-store-submission.md).
+For detailed Microsoft Store submission instructions, see [`docs/ms-store-submission.md`](docs/ms-store-submission.md).
+
+## Project Structure
+
+```
+PhotoSift/
+├── src/                          # Source code
+│   ├── launchPhotoSiftApp.py    # Main application launcher
+│   ├── ImageClassifierGUI.py    # Image classifier interface
+│   ├── DuplicateImageIdentifierGUI.py  # Duplicate finder interface
+│   ├── CommonUI.py              # Shared UI components
+│   └── ...
+├── docs/                         # Documentation
+│   ├── ReleaseSteps.md          # Release process guide
+│   ├── STORE_PACKAGE_CHECKLIST.md  # Store submission checklist
+│   ├── ms-store-submission.md   # Store submission guide
+│   └── RELEASE_NOTES_v1.2.0.md  # Latest release notes
+├── assets/                       # Static assets (icons, etc.)
+├── resources/                    # Runtime resources
+│   └── app.ico                  # Application icon
+├── build.bat                     # Main build script
+├── create_store_package.bat     # Store package builder
+├── create_store_assets.py       # Asset generator
+├── PhotoSift.spec               # PyInstaller configuration
+├── installer.iss                # Inno Setup configuration
+└── README.md                    # This file
+```
 
 ## Development Setup
 
@@ -244,7 +270,7 @@ PhotoSift is designed with privacy as a top priority:
 - **Offline operation** - No internet connection required after installation
 - **Your photos stay private** - Images never leave your computer
 
-See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for complete details.
+See [docs/PRIVACY_POLICY.md](docs/PRIVACY_POLICY.md) for complete details.
 
 ## License
 
