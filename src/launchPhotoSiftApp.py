@@ -371,7 +371,7 @@ def show_app_selection():
     # Create selection window
     selection_window = tk.Tk()
     selection_window.title("PhotoSift - Welcome! Please select a features")
-    selection_window.geometry("500x250")  # Increased both width and height
+    selection_window.geometry("500x300")  # Increased both width and height
     selection_window.configure(bg='#1e293b')
     selection_window.resizable(False, False)
     # Option: Minimal title bar with minimize button
@@ -387,7 +387,7 @@ def show_app_selection():
     selection_window.update_idletasks()
     x = (selection_window.winfo_screenwidth() // 2) - (500 // 2)
     y = (selection_window.winfo_screenheight() // 2) - (250 // 2)
-    selection_window.geometry(f"500x250+{x}+{y}")
+    selection_window.geometry(f"500x300+{x}+{y}")
     
     # Create main frame (also draggable)
     main_frame = tk.Frame(selection_window, bg='#1e293b', padx=30, pady=20)
@@ -435,6 +435,17 @@ def show_app_selection():
             root.mainloop()
         except Exception as e:
             print(f"Error launching DuplicateImageIdentifierGUI: {e}")
+
+    def launch_blurry_detector():
+        """Launch BlurryImageDetectionGUI and close selection window"""
+        selection_window.destroy()
+        try:
+            from BlurryImageDetectionGUI import BlurryImageDetectionApp
+            root = tk.Tk()
+            app = BlurryImageDetectionApp(root)
+            root.mainloop()
+        except Exception as e:
+            print(f"Error launching BlurryImageDetectionGUI: {e}")
     
     # Identify unwanted photo button
     unwanted_btn = tk.Button(button_frame,
@@ -465,6 +476,21 @@ def show_app_selection():
                              padx=20, pady=5,
                              height=1)
     duplicate_btn.pack(pady=5, fill=tk.X)
+
+    # Identify blurry photo button
+    blurry_btn = tk.Button(button_frame,
+                             text="🌫️ Detect Blurry Photos",
+                             command=launch_blurry_detector,
+                             font=("Segoe UI", 12, "bold"),
+                             bg='#f97316',  # Orange color
+                             fg='#f1f5f9',
+                             activebackground='#ea580c',
+                             activeforeground='#f1f5f9',
+                             bd=0, relief=tk.FLAT,
+                             cursor="hand2",
+                             padx=20, pady=5,
+                             height=1)
+    blurry_btn.pack(pady=5, fill=tk.X)
     
     # Start the selection window
     selection_window.mainloop()

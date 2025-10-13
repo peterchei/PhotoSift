@@ -233,6 +233,10 @@ class ModernStyling:
                        darkcolor=colors['bg_secondary'],
                        lightcolor=colors['bg_secondary'])
         
+        style.map("Modern.Vertical.TScrollbar",
+                  background=[('active', colors['bg_card']), ('!active', colors['bg_secondary'])],
+                  troughcolor=[('!active', colors['bg_primary'])])
+        
         style.configure("Modern.Horizontal.TScrollbar",
                        background=colors['bg_secondary'],
                        troughcolor=colors['bg_primary'],
@@ -240,6 +244,10 @@ class ModernStyling:
                        arrowcolor=colors['text_secondary'],
                        darkcolor=colors['bg_secondary'],
                        lightcolor=colors['bg_secondary'])
+
+        style.map("Modern.Horizontal.TScrollbar",
+                  background=[('active', colors['bg_card']), ('!active', colors['bg_secondary'])],
+                  troughcolor=[('!active', colors['bg_primary'])])
 
 
 class StatusBar:
