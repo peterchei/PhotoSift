@@ -15,7 +15,7 @@ from tkinter import filedialog, messagebox, ttk
 from PIL import Image, ImageTk
 
 # Local imports
-from BlurryImageDetection import detect_blurry_images, get_recommended_threshold, BlurryImageDetector
+from BlurryImageDetection import detect_blurry_images_batch, get_recommended_threshold, BlurryImageDetector
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
                      StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager)
 
@@ -23,20 +23,26 @@ class BlurryImageDetectionApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Blurry Image Detector")
-        self.root.geometry("1400x900")
-        self.root.minsize(1000, 700)
+        # Maximize window on startup
+        self.root.state('zoomed')  # Windows maximized state
 
         self.folder = ""
         self.blurry_images = []
         self.sharp_images = []
         self.current_paths = []
         self.current_page = 0
-        self.page_size = 20
+        self.page_size = 50
         self.thumb_imgs = []
         self.image_cache = {}
+        self.blur_scores = {}  # Cache blur scores to avoid recalculation
         self.selected_check_vars = []
         self._cleaning_in_progress = False
         self.detector = BlurryImageDetector()
+        
+        # Thumbnail size configuration
+        self.thumb_size = (240, 180)  # Default size
+        self.min_thumb_size = (60, 45)  # Minimum size
+        self.max_thumb_size = (580, 360)  # Maximum size
 
         # Use centralized color scheme
         self.colors = ModernColors.get_color_scheme()
@@ -73,41 +79,79 @@ class BlurryImageDetectionApp:
     def setup_ui(self):
         self.root.configure(bg=self.colors['bg_primary'])
 
-        # Main frame
-        main_frame = tk.Frame(self.root, bg=self.colors['bg_primary'])
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        # Modern header
+        header = tk.Frame(self.root, bg=self.colors['bg_primary'], height=80)
+        header.pack(fill=tk.X, padx=20, pady=(20, 0))
+        header.pack_propagate(False)
+        
+        # App title section
+        title_frame = tk.Frame(header, bg=self.colors['bg_primary'])
+        title_frame.pack(side=tk.LEFT, fill=tk.Y)
+        
+        title_label = tk.Label(title_frame, 
+                              text="PhotoSift", 
+                              font=("Segoe UI", 28, "bold"),
+                              bg=self.colors['bg_primary'], 
+                              fg=self.colors['text_primary'])
+        title_label.pack(anchor="w")
+        
+        subtitle_label = tk.Label(title_frame, 
+                                 text="Blurry Image Detector", 
+                                 font=("Segoe UI", 14),
+                                 bg=self.colors['bg_primary'], 
+                                 fg=self.colors['text_secondary'])
+        subtitle_label.pack(anchor="w")
 
-        # Left panel for controls and results
-        left_panel = tk.Frame(main_frame, width=300, bg=self.colors['bg_secondary'])
+        # Header buttons frame
+        header_buttons = tk.Frame(header, bg=self.colors['bg_primary'])
+        header_buttons.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Create trash manager using common component in header
+        self.trash_manager = TrashManager(
+            header_buttons, 
+            self.colors, 
+            lambda: self.folder, 
+            {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}, 
+            button_style="emoji")
+        self.trash_manager.pack(side=tk.RIGHT, padx=(10, 0))
+
+        # Main content container
+        content = tk.Frame(self.root, bg=self.colors['bg_primary'])
+        content.pack(fill=tk.BOTH, expand=True, padx=20, pady=(20, 20))
+
+        # Left panel (sidebar) for controls and results
+        left_panel = tk.Frame(content, width=300, bg=self.colors['bg_sidebar'])
         left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 20))
         left_panel.pack_propagate(False)
 
-        # Right panel for thumbnails
-        self.right_frame = tk.Frame(main_frame, bg=self.colors['bg_primary'])
-        self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Right panel (main area) for thumbnails
+        main_area = tk.Frame(content, bg=self.colors['bg_primary'])
+        main_area.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        
+        self.right_frame = main_area
 
         # --- Left Panel ---
         # Folder selection
-        folder_frame = tk.Frame(left_panel, bg=self.colors['bg_secondary'])
-        folder_frame.pack(fill=tk.X, padx=15, pady=15)
+        folder_frame = tk.Frame(left_panel, bg=self.colors['bg_sidebar'])
+        folder_frame.pack(fill=tk.X, padx=20, pady=(20, 15))
         
         btn_select = ModernButton.create_primary_button(folder_frame, text="Select Folder", command=self.select_folder, colors=self.colors)
         btn_select.pack(fill=tk.X)
         ToolTip(btn_select, "Select a folder to scan for blurry images")
 
         self.lbl_folder = tk.Label(folder_frame, text="No folder selected", 
-                                   wraplength=270, justify=tk.LEFT,
-                                   bg=self.colors['bg_secondary'], fg=self.colors['text_secondary'],
-                                   font=("Segoe UI", 9))
-        self.lbl_folder.pack(pady=(10, 0))
+                                   wraplength=260, justify=tk.LEFT,
+                                   bg=self.colors['bg_sidebar'], fg=self.colors['text_secondary'],
+                                   font=("Segoe UI", 10))
+        self.lbl_folder.pack(fill=tk.X, pady=(8, 0))
 
         # Threshold control
-        threshold_frame = tk.Frame(left_panel, bg=self.colors['bg_secondary'])
-        threshold_frame.pack(fill=tk.X, padx=15, pady=15)
+        threshold_frame = tk.Frame(left_panel, bg=self.colors['bg_sidebar'])
+        threshold_frame.pack(fill=tk.X, padx=20, pady=15)
         
         tk.Label(threshold_frame, text="Blur Threshold", 
                  font=("Segoe UI", 12, "bold"),
-                 bg=self.colors['bg_secondary'], fg=self.colors['text_primary']).pack(anchor="w")
+                 bg=self.colors['bg_sidebar'], fg=self.colors['text_primary']).pack(anchor="w")
 
         self.threshold_var = tk.DoubleVar(value=100.0)
         self.threshold_slider = ttk.Scale(threshold_frame, from_=10, to=300, 
@@ -117,18 +161,29 @@ class BlurryImageDetectionApp:
         ToolTip(self.threshold_slider, "Adjust the sensitivity for blur detection.\nLower values detect only very blurry images.")
 
         self.lbl_threshold = tk.Label(threshold_frame, text="Current: 100.0",
-                                      bg=self.colors['bg_secondary'], fg=self.colors['text_secondary'],
-                                      font=("Segoe UI", 9))
+                                      bg=self.colors['bg_sidebar'], fg=self.colors['text_secondary'],
+                                      font=("Segoe UI", 10))
         self.lbl_threshold.pack(anchor="w")
 
         # Scan button
         btn_scan = ModernButton.create_primary_button(left_panel, text="Start Scan", command=self.start_scan, colors=self.colors)
-        btn_scan.pack(fill=tk.X, padx=15)
+        btn_scan.pack(fill=tk.X, padx=20)
         ToolTip(btn_scan, "Begin scanning the selected folder for blurry images")
 
+        # Results section
+        categories_section = tk.Frame(left_panel, bg=self.colors['bg_sidebar'])
+        categories_section.pack(fill=tk.BOTH, expand=True, padx=20, pady=15)
+        
+        categories_label = tk.Label(categories_section, 
+                                   text="Categories", 
+                                   bg=self.colors['bg_sidebar'], 
+                                   font=("Segoe UI", 14, "bold"), 
+                                   fg=self.colors['text_primary'])
+        categories_label.pack(anchor="w", pady=(0, 10))
+        
         # Results TreeView
-        tree_frame = tk.Frame(left_panel, bg=self.colors['bg_secondary'])
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
+        tree_frame = tk.Frame(categories_section, bg=self.colors['bg_card'])
+        tree_frame.pack(fill=tk.BOTH, expand=True)
 
         tree_scroll = ttk.Scrollbar(tree_frame, orient="vertical", style="Modern.Vertical.TScrollbar")
         self.tree = ttk.Treeview(tree_frame, columns=("count",), show="tree headings", style="Treeview", yscrollcommand=tree_scroll.set)
@@ -145,13 +200,48 @@ class BlurryImageDetectionApp:
 
         # --- Right Panel ---
         # Top navigation bar
-        nav_bar = tk.Frame(self.right_frame, bg=self.colors['bg_primary'], height=50)
-        nav_bar.pack(fill=tk.X, pady=(0, 10))
+        nav_bar = tk.Frame(self.right_frame, bg=self.colors['bg_primary'], height=60)
+        nav_bar.pack(fill=tk.X, pady=(0, 20))
         nav_bar.pack_propagate(False)
+
+        # Zoom controls (left side)
+        zoom_frame = tk.Frame(nav_bar, bg=self.colors['bg_primary'])
+        zoom_frame.pack(side=tk.LEFT, fill=tk.Y)
+        
+        self.zoom_out_btn = tk.Button(zoom_frame, 
+                                     text="🔍-", 
+                                     command=self.zoom_out,
+                                     font=("Segoe UI", 14),
+                                     bg=self.colors['bg_secondary'],
+                                     fg=self.colors['text_primary'],
+                                     activebackground=self.colors['bg_card'],
+                                     bd=0, relief=tk.FLAT, cursor="hand2",
+                                     padx=12, pady=8)
+        self.zoom_out_btn.pack(side=tk.LEFT, padx=(0, 5))
+        ToolTip(self.zoom_out_btn, "Decrease thumbnail size\nMake thumbnails smaller to see more images at once")
+        
+        self.zoom_in_btn = tk.Button(zoom_frame, 
+                                    text="🔍+", 
+                                    command=self.zoom_in,
+                                    font=("Segoe UI", 14),
+                                    bg=self.colors['bg_secondary'],
+                                    fg=self.colors['text_primary'],
+                                    activebackground=self.colors['bg_card'],
+                                    bd=0, relief=tk.FLAT, cursor="hand2",
+                                    padx=12, pady=8)
+        self.zoom_in_btn.pack(side=tk.LEFT, padx=(0, 10))
+        ToolTip(self.zoom_in_btn, "Increase thumbnail size\nMake thumbnails larger for better detail")
+        
+        self.zoom_label = tk.Label(zoom_frame, 
+                                  text="100%", 
+                                  font=("Segoe UI", 12), 
+                                  bg=self.colors['bg_primary'], 
+                                  fg=self.colors['text_secondary'])
+        self.zoom_label.pack(side=tk.LEFT, fill=tk.Y)
 
         # Action buttons (right-aligned)
         action_frame = tk.Frame(nav_bar, bg=self.colors['bg_primary'])
-        action_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 10))
+        action_frame.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.select_all_btn_var = tk.StringVar(value="Select All")
         self.select_all_btn = ModernButton.create_secondary_button(action_frame, "", command=self.select_all_photos, colors=self.colors, textvariable=self.select_all_btn_var)
@@ -163,39 +253,57 @@ class BlurryImageDetectionApp:
         self.clean_btn.pack(side=tk.LEFT, padx=(0, 10))
         ToolTip(self.clean_btn, "Move selected blurry photos to the trash")
 
-        self.trash_manager = TrashManager(
-            parent_frame=action_frame,
-            colors=self.colors,
-            folder_callback=lambda: self.folder,
-            img_extensions={'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'},
-            button_style="text"
-        )
-        self.trash_manager.pack(side=tk.LEFT)
-
-        # Pagination controls (centered)
-        self.page_frame = tk.Frame(nav_bar, bg=self.colors['bg_primary'])
-        self.page_frame.pack(expand=True)
-
-        self.prev_page_btn = ModernButton.create_secondary_button(self.page_frame, text="<< Prev", command=self.prev_page, colors=self.colors)
-        self.prev_page_btn.pack(side=tk.LEFT)
+        # Main thumbnail container
+        thumb_container = tk.Frame(self.right_frame, bg=self.colors['bg_primary'])
+        thumb_container.pack(fill=tk.BOTH, expand=True)
         
-        self.page_label = tk.Label(self.page_frame, text="Page 1/1", bg=self.colors['bg_primary'], fg=self.colors['text_primary'], font=("Segoe UI", 11))
-        self.page_label.pack(side=tk.LEFT, padx=15)
+        # Pagination controls at top
+        self.page_frame = tk.Frame(thumb_container, bg=self.colors['bg_primary'], height=50)
+        self.page_frame.pack(fill=tk.X, pady=(0, 20))
+        self.page_frame.pack_propagate(False)
         
-        self.next_page_btn = ModernButton.create_secondary_button(self.page_frame, text="Next >>", command=self.next_page, colors=self.colors)
-        self.next_page_btn.pack(side=tk.LEFT)
+        # Center container for navigation
+        nav_center = tk.Frame(self.page_frame, bg=self.colors['bg_primary'])
+        nav_center.pack(expand=True)
+        
+        nav_btn_style = {"font": ("Segoe UI", 12), 
+                        "bg": self.colors['bg_secondary'], 
+                        "fg": self.colors['text_primary'],
+                        "activebackground": self.colors['bg_card'], 
+                        "activeforeground": self.colors['text_primary'],
+                        "bd": 0, "padx": 20, "pady": 8, "cursor": "hand2"}
+        
+        self.prev_page_btn = tk.Button(nav_center, text="← Previous", command=self.prev_page, **nav_btn_style)
+        self.prev_page_btn.pack(side=tk.LEFT, padx=(0, 15))
+        
+        self.page_label = tk.Label(nav_center, text="Page 1 of 1", 
+                                  font=("Segoe UI", 12, "bold"), 
+                                  bg=self.colors['bg_primary'], 
+                                  fg=self.colors['text_primary'])
+        self.page_label.pack(side=tk.LEFT, padx=20)
+        
+        self.next_page_btn = tk.Button(nav_center, text="Next →", command=self.next_page, **nav_btn_style)
+        self.next_page_btn.pack(side=tk.LEFT, padx=(15, 0))
+        
+        self.page_frame.pack_forget()  # Hide initially
 
         # Thumbnail display area
-        self.thumb_canvas = tk.Canvas(self.right_frame, bg=self.colors['bg_primary'], highlightthickness=0)
-        self.thumb_scrollbar = ttk.Scrollbar(self.right_frame, orient="vertical", command=self.thumb_canvas.yview, style="Modern.Vertical.TScrollbar")
+        content_frame = tk.Frame(thumb_container, bg=self.colors['bg_primary'])
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=20)
+        
+        self.thumb_canvas = tk.Canvas(content_frame, bg=self.colors['bg_primary'], highlightthickness=0, bd=0)
+        self.thumb_scrollbar = ttk.Scrollbar(content_frame, orient="vertical", command=self.thumb_canvas.yview, style="Modern.Vertical.TScrollbar")
         self.thumbs_frame = tk.Frame(self.thumb_canvas, bg=self.colors['bg_primary'])
 
         self.thumb_canvas.configure(yscrollcommand=self.thumb_scrollbar.set)
         self.thumb_canvas.create_window((0, 0), window=self.thumbs_frame, anchor="nw")
         self.thumbs_frame.bind("<Configure>", lambda e: self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all")))
 
-        self.thumb_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.thumb_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.thumb_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Bind canvas configure event
+        self.thumb_canvas.bind("<Configure>", self.on_canvas_configure)
         
         self.thumb_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
 
@@ -206,6 +314,59 @@ class BlurryImageDetectionApp:
     def _on_mousewheel(self, event):
         if self.thumb_canvas.winfo_exists():
             self.thumb_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+    def on_canvas_configure(self, event=None):
+        """Handle canvas resize events and refresh layout if needed"""
+        # Update scroll region
+        self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all"))
+        
+        # Only refresh layout if width changed significantly
+        if event and hasattr(self, 'last_width') and abs(event.width - self.last_width) < 50:
+            return
+            
+        self.last_width = event.width if event else self.thumb_canvas.winfo_width()
+        
+        # If we have current paths displayed, refresh the layout
+        if hasattr(self, 'current_paths') and self.current_paths:
+            self.show_thumbnails_for_category(self.tree.selection()[0] if self.tree.selection() else "blurry")
+
+    def zoom_in(self):
+        """Increase thumbnail size"""
+        width, height = self.thumb_size
+        new_width = min(width + 60, self.max_thumb_size[0])
+        new_height = min(height + 45, self.max_thumb_size[1])
+        
+        if (new_width, new_height) != self.thumb_size:
+            self.thumb_size = (new_width, new_height)
+            self.image_cache.clear()  # Clear cache to force regeneration at new size
+            self.update_zoom_controls()
+            if self.current_paths:
+                self.display_page()
+    
+    def zoom_out(self):
+        """Decrease thumbnail size"""
+        width, height = self.thumb_size
+        new_width = max(width - 60, self.min_thumb_size[0])
+        new_height = max(height - 45, self.min_thumb_size[1])
+        
+        if (new_width, new_height) != self.thumb_size:
+            self.thumb_size = (new_width, new_height)
+            self.image_cache.clear()  # Clear cache to force regeneration at new size
+            self.update_zoom_controls()
+            if self.current_paths:
+                self.display_page()
+    
+    def update_zoom_controls(self):
+        """Update zoom button states and percentage label"""
+        can_zoom_in = self.thumb_size[0] < self.max_thumb_size[0]
+        can_zoom_out = self.thumb_size[0] > self.min_thumb_size[0]
+        
+        self.zoom_in_btn.config(state=tk.NORMAL if can_zoom_in else tk.DISABLED)
+        self.zoom_out_btn.config(state=tk.NORMAL if can_zoom_out else tk.DISABLED)
+        
+        # Calculate zoom percentage (based on width)
+        zoom_percent = int((self.thumb_size[0] / 240) * 100)
+        self.zoom_label.config(text=f"{zoom_percent}%")
 
     def _get_image_count(self, folder_path):
         """Quickly count the number of images in a folder."""
@@ -250,13 +411,21 @@ class BlurryImageDetectionApp:
             # Ensure updates happen on the main thread
             self.root.after(0, self.progress_window.update, current, total, f"Processing: {filename}", f"{current}/{total}")
 
-        results = detect_blurry_images(folder, threshold, progress_callback)
+        # Use batch processing for better performance
+        results = detect_blurry_images_batch(folder, threshold, progress_callback)
         self.root.after(0, self.on_scan_complete, results)
 
     def on_scan_complete(self, results):
         self.progress_window.close()
         self.blurry_images = results['blurry_images']
         self.sharp_images = results['sharp_images']
+
+        # Cache blur scores for fast lookup during display
+        self.blur_scores.clear()
+        for path, score in self.blurry_images:
+            self.blur_scores[path] = score
+        for path, score in self.sharp_images:
+            self.blur_scores[path] = score
 
         # Clear previous tree entries
         for i in self.tree.get_children():
@@ -291,6 +460,12 @@ class BlurryImageDetectionApp:
         
         self.current_page = 0
         self.display_page()
+        
+        # Show pagination if we have images
+        if self.current_paths:
+            self.page_frame.pack(fill=tk.X, pady=(0, 20))
+        else:
+            self.page_frame.pack_forget()
 
     def display_page(self):
         self.root.config(cursor="wait")
@@ -304,53 +479,115 @@ class BlurryImageDetectionApp:
         end_idx = start_idx + self.page_size
         page_paths = self.current_paths[start_idx:end_idx]
 
-        cols = self.calculate_columns()
+        # Calculate grid layout based on thumbnail size
+        canvas_width = self.thumb_canvas.winfo_width()
+        if canvas_width < 200: canvas_width = 1000  # Default width
+        thumb_width = self.thumb_size[0] + 30  # Add padding
+        cols = max(1, canvas_width // thumb_width)
         
         for idx, path in enumerate(page_paths):
             row, col = divmod(idx, cols)
             
-            card = tk.Frame(self.thumbs_frame, bd=1, relief=tk.SOLID, bg=self.colors['bg_card'],
-                            highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
-            card.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
+            # Configure grid weights
+            self.thumbs_frame.grid_columnconfigure(col, weight=1)
+            
+            # Modern card with rounded corners
+            card = tk.Frame(self.thumbs_frame, bd=0, 
+                           bg=self.colors['bg_card'], 
+                           highlightbackground=self.colors['bg_secondary'], 
+                           highlightthickness=1,
+                           relief=tk.SOLID)
+            card.grid(row=row, column=col, padx=15, pady=15, sticky="nsew")
+
+            # Image container with padding
+            img_container = tk.Frame(card, bg=self.colors['bg_card'])
+            img_container.pack(fill=tk.BOTH, expand=True, padx=12, pady=(12, 8))
 
             img_tk = self.get_thumbnail(path)
             self.thumb_imgs.append(img_tk)
 
-            lbl_img = tk.Label(card, image=img_tk, bg=self.colors['bg_card'])
-            lbl_img.pack(pady=5)
+            lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
+            lbl_img.image = img_tk
+            lbl_img.pack()
             lbl_img.bind('<Double-Button-1>', lambda e, p=path: self.open_full_image(p))
 
+            # Modern hover effects
+            def on_enter(ev, c=card):
+                c.config(highlightbackground=self.colors['accent'], highlightthickness=2)
+            def on_leave(ev, c=card):
+                c.config(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
+            
+            card.bind("<Enter>", on_enter)
+            card.bind("<Leave>", on_leave)
+            lbl_img.bind("<Enter>", on_enter)
+            lbl_img.bind("<Leave>", on_leave)
+
+            # Info section at bottom
+            info_frame = tk.Frame(card, bg=self.colors['bg_card'])
+            info_frame.pack(fill=tk.X, padx=12, pady=(0, 12))
+
             var = tk.BooleanVar()
-            chk = tk.Checkbutton(card, text=os.path.basename(path), variable=var,
-                                 bg=self.colors['bg_card'], fg=self.colors['text_primary'],
-                                 selectcolor=self.colors['bg_secondary'], activebackground=self.colors['bg_card'],
-                                 font=("Segoe UI", 8))
-            chk.pack(anchor="w", padx=5)
+            filename = os.path.basename(path)
+            if len(filename) > 25:
+                filename = filename[:22] + "..."
+                
+            chk = tk.Checkbutton(info_frame, 
+                               text=filename, 
+                               variable=var,
+                               font=("Segoe UI", 10, "bold"), 
+                               bg=self.colors['bg_card'],
+                               fg=self.colors['text_primary'],
+                               activebackground=self.colors['bg_card'],
+                               selectcolor=self.colors['accent'], 
+                               bd=0, highlightthickness=0,
+                               anchor="w")
+            chk.pack(fill=tk.X, pady=(0, 4))
+            
             var.trace_add('write', lambda *args: self.update_clean_btn_label())
             self.selected_check_vars.append((var, path))
 
-            score = self.detector.calculate_blur_score(path)
+            # Get blur score from cache (already calculated during scan)
+            score = self.blur_scores.get(path, 0)
             quality = self.detector.get_blur_quality(score)
-            score_label = tk.Label(card, text=f"Score: {score:.2f} ({quality})", 
-                                   bg=self.colors['bg_card'], fg=self.colors['text_secondary'],
-                                   font=("Segoe UI", 8))
-            score_label.pack(anchor="w", padx=5, pady=(0,5))
+            
+            # Color code based on quality
+            if quality in ["Excellent", "Good"]:
+                score_color = self.colors['success']
+            elif quality == "Fair":
+                score_color = self.colors['accent']
+            elif quality == "Poor":
+                score_color = self.colors['warning']
+            else:
+                score_color = self.colors['danger']
+            
+            score_label = tk.Label(info_frame, 
+                                   text=f"Score: {score:.2f} ({quality})", 
+                                   bg=self.colors['bg_card'], 
+                                   fg=score_color,
+                                   font=("Segoe UI", 9),
+                                   anchor="w")
+            score_label.pack(fill=tk.X)
+            
+            # Add tooltip with blur score explanation
+            tooltip_text = self.get_blur_score_tooltip(score, quality)
+            ToolTip(score_label, tooltip_text)
 
         self.update_page_controls()
         self.update_clean_btn_label()
+        self.update_zoom_controls()
         self.root.config(cursor="")
         self.thumb_canvas.yview_moveto(0)
 
     def get_thumbnail(self, path):
-        thumb_size = (150, 150)
-        if (path, thumb_size) in self.image_cache:
-            return self.image_cache[(path, thumb_size)]
+        cache_key = (path, self.thumb_size)
+        if cache_key in self.image_cache:
+            return self.image_cache[cache_key]
         
         try:
             img = Image.open(path)
-            img.thumbnail(thumb_size, Image.Resampling.LANCZOS)
+            img.thumbnail(self.thumb_size, Image.Resampling.LANCZOS)
             img_tk = ImageTk.PhotoImage(img)
-            self.image_cache[(path, thumb_size)] = img_tk
+            self.image_cache[cache_key] = img_tk
             return img_tk
         except Exception as e:
             print(f"Error creating thumbnail for {path}: {e}")
@@ -359,12 +596,39 @@ class BlurryImageDetectionApp:
     def calculate_columns(self):
         canvas_width = self.thumb_canvas.winfo_width()
         if canvas_width < 200: canvas_width = self.right_frame.winfo_width()
-        thumb_width = 150 + 20 # thumb size + padding
+        thumb_width = self.thumb_size[0] + 30 # thumb size + padding
         return max(1, canvas_width // thumb_width)
 
+    def get_blur_score_tooltip(self, score, quality):
+        """Generate helpful tooltip text for blur scores"""
+        if quality == "Excellent":
+            explanation = "This image is very sharp with excellent detail."
+        elif quality == "Good":
+            explanation = "This image is sharp with good detail."
+        elif quality == "Fair":
+            explanation = "This image has acceptable sharpness but may lack some detail."
+        elif quality == "Poor":
+            explanation = "This image shows noticeable blur and lacks fine detail."
+        else:  # Very Blurry
+            explanation = "This image is significantly blurred or out of focus."
+        
+        tooltip = f"Blur Score: {score:.2f}\n"
+        tooltip += f"Quality: {quality}\n\n"
+        tooltip += explanation
+        
+        tooltip += f"\n\nHow it works:\n"
+        tooltip += f"Higher scores (>100) indicate sharper images.\n"
+        tooltip += f"Lower scores (<100) indicate blurrier images.\n"
+        tooltip += f"The score measures edge sharpness using the Laplacian operator."
+        
+        if score < 100:
+            tooltip += "\n\nTip: Consider reviewing or removing blurry images to maintain photo quality."
+        
+        return tooltip
+
     def update_page_controls(self):
-        total_pages = (len(self.current_paths) - 1) // self.page_size + 1
-        self.page_label.config(text=f"Page {self.current_page + 1}/{total_pages}")
+        total_pages = max(1, (len(self.current_paths) - 1) // self.page_size + 1) if self.current_paths else 1
+        self.page_label.config(text=f"Page {self.current_page + 1} of {total_pages}")
         self.prev_page_btn.config(state=tk.NORMAL if self.current_page > 0 else tk.DISABLED)
         self.next_page_btn.config(state=tk.NORMAL if (self.current_page + 1) < total_pages else tk.DISABLED)
 

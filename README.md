@@ -2,7 +2,7 @@
 
 > 🤖 **AI-Human Collaboration Project**: This application was developed through an innovative collaboration between a human developer and an AI coding agent (GitHub Copilot). Over 90% of the codebase was generated and refined through AI suggestions, with human oversight focused on architectural decisions and quality assurance.
 
-PhotoSift is an AI-powered image classification tool that helps you organize your photos by automatically categorizing them into different types (people photos vs screenshots). It uses the CLIP model from OpenAI for accurate image classification.
+PhotoSift is an AI-powered image management tool that helps you organize your photos by automatically categorizing them and identifying issues. It uses advanced computer vision techniques including the CLIP model from OpenAI for accurate image classification and OpenCV for blur detection.
 
 ## AI-Driven Development
 
@@ -22,14 +22,52 @@ This project serves as a case study in next-generation software development, dem
 
 ## Features
 
-- Drag and drop interface for easy image loading
-- Automatic classification of images into categories:
+PhotoSift provides three powerful tools for managing your photo collection:
+
+### 1. 🧹 Identify Unwanted Photos
+- **AI-powered classification** using OpenAI's CLIP model
+- Automatically categorizes images into:
   - People photos (portraits, group photos, selfies, etc.)
   - Screenshots (computer screens, mobile captures, etc.)
-- Real-time processing with progress indication
-- Easy selection and organization of classified images
-- Batch processing capability for large collections
-- Simple and intuitive user interface
+- **Confidence scores** with color-coded visual indicators
+- Smart tooltips explaining classification results
+- Batch processing for large collections
+- Zoom in/out for detailed inspection
+
+### 2. 🔍 Identify Duplicate Photos
+- **Perceptual duplicate detection** using CLIP embeddings
+- Finds visually similar images even with different:
+  - File names
+  - Resolutions
+  - Formats
+  - Minor edits
+- **Similarity scoring** to help you decide which copies to keep
+- Side-by-side comparison view
+- Efficient duplicate grouping
+
+### 3. 🌫️ Detect Blurry Photos
+- **Advanced blur detection** using Laplacian variance analysis
+- **Multi-threaded batch processing** for fast scanning
+- **Adjustable threshold** - customize sensitivity for your needs
+- **Quality scoring** with 5 levels:
+  - Excellent (>500)
+  - Good (250-500)
+  - Fair (100-250)
+  - Poor (50-100)
+  - Very Blurry (<50)
+- **Color-coded scores** for quick visual assessment
+- Detailed tooltips explaining blur metrics
+- Zoom controls for inspecting image details
+
+### Common Features Across All Tools
+- **Modern dark-themed UI** with intuitive controls
+- **Real-time processing** with progress indication
+- **Thumbnail view** with responsive grid layout
+- **Batch operations** - process hundreds of images efficiently
+- **Safe cleaning** - moves unwanted photos to trash (recoverable)
+- **Trash manager** - easily review and restore deleted items
+- **Page-by-page navigation** for large collections (50 images per page)
+- **Full image viewer** with EXIF data display
 
 ## System Requirements
 
@@ -116,10 +154,14 @@ For detailed Microsoft Store submission instructions, see [`docs/ms-store-submis
 ```
 PhotoSift/
 ├── src/                          # Source code
-│   ├── launchPhotoSiftApp.py    # Main application launcher
-│   ├── ImageClassifierGUI.py    # Image classifier interface
-│   ├── DuplicateImageIdentifierGUI.py  # Duplicate finder interface
-│   ├── CommonUI.py              # Shared UI components
+│   ├── launchPhotoSiftApp.py    # Main application launcher with feature selection
+│   ├── ImageClassifierGUI.py    # AI-powered image classifier (people vs screenshots)
+│   ├── ImageClassification.py   # CLIP-based classification logic
+│   ├── DuplicateImageIdentifierGUI.py  # Duplicate photo finder interface
+│   ├── DuplicateImageIdentifier.py     # Duplicate detection logic
+│   ├── BlurryImageDetectionGUI.py      # Blur detector interface (NEW!)
+│   ├── BlurryImageDetection.py         # Blur detection logic (NEW!)
+│   ├── CommonUI.py              # Shared UI components and styling
 │   └── ...
 ├── docs/                         # Documentation
 │   ├── ReleaseSteps.md          # Release process guide
@@ -152,67 +194,70 @@ PhotoSift/
 
 3. Run the application:
    ```bash
-   python src/ImageClassifierGUI.py
+   # Launch main menu to select a tool
+   python src/launchPhotoSiftApp.py
+   
+   # Or launch individual tools directly:
+   python src/ImageClassifierGUI.py           # Image classifier
+   python src/DuplicateImageIdentifierGUI.py  # Duplicate finder
+   python src/BlurryImageDetectionGUI.py      # Blur detector
    ```
-
-## Project Structure
-
-```
-PhotoSift/
-├── src/
-│   ├── ImageClassifierGUI.py           # Main GUI application
-│   ├── ImageClassification.py          # AI classification logic
-│   └── DuplicateImageIdentifier.py     # Duplicate detection module
-├── resources/
-│   └── app.ico                         # Application icon
-├── models/                             # AI model files (downloaded during build)
-├── store_package/                      # Microsoft Store package files
-│   ├── AppxManifest.xml               # Store package manifest
-│   ├── PhotoSift.exe                  # Built application executable
-│   ├── app.ico                        # Application icon copy
-│   └── Assets/                        # Store listing assets
-│       ├── Square44x44Logo.png        # App list icon (44x44)
-│       ├── Square150x150Logo.png      # Medium tile (150x150)
-│       └── StoreLogo.png              # Store listing logo
-├── build_env/                          # Build virtual environment
-├── dist/                              # PyInstaller output directory
-├── build/                             # PyInstaller build cache
-├── Output/                            # Inno Setup installer output
-├── build.bat                          # Main build script
-├── create_store_package.bat           # Microsoft Store package creation
-├── create_store_assets.py             # Store asset generation script
-├── setup.py                           # Package configuration
-├── pyproject.toml                     # Modern Python project config
-├── ms-store-submission.md             # Microsoft Store submission guide
-├── photosift.iss                     # Inno Setup configuration
-├── PhotoSift.msix                     # Microsoft Store package (575MB)
-└── README.md                          # Documentation
-```
-
-### Key Directories
-
-- **`src/`** - Source code for the main application
-- **`store_package/`** - Complete Microsoft Store package structure
-- **`Assets/`** - Store-specific logos and icons
-- **`dist/`** - Built executable output from PyInstaller
-- **`Output/`** - Windows installer created by Inno Setup
-- **`build_env/`** - Isolated Python environment for building
-
-### Build Artifacts
-
-- **`PhotoSift.exe`** - Main application executable (~576MB)
-- **`PhotoSift.msix`** - Microsoft Store package (~575MB)
-- **`PhotoSift_Setup.exe`** - Windows installer package
 
 ## How It Works
 
-PhotoSift uses the CLIP (Contrastive Language-Image Pre-Training) model from OpenAI to classify images. The model has been trained on a diverse set of images and can effectively distinguish between different types of photos.
+### Image Classification (People vs Screenshots)
+PhotoSift uses the CLIP (Contrastive Language-Image Pre-Training) model from OpenAI to classify images. The model:
+- Has been trained on millions of diverse images
+- Understands the relationship between images and text descriptions
+- Can effectively distinguish between different types of photos
+- Provides confidence scores for each classification
 
-The application:
+**Process:**
 1. Loads images from selected folders
-2. Processes them through the CLIP model
-3. Classifies them based on confidence scores
-4. Organizes them into appropriate categories
+2. Processes them through the CLIP model in batches
+3. Classifies based on confidence scores
+4. Organizes results into categories
+
+### Duplicate Detection
+Uses CLIP embeddings to find perceptually similar images:
+- Generates high-dimensional vector representations of images
+- Compares vectors using cosine similarity
+- Groups images by similarity threshold
+- Works even if images are resized, reformatted, or slightly edited
+
+**Process:**
+1. Generates CLIP embeddings for all images
+2. Calculates similarity scores between image pairs
+3. Groups similar images together
+4. Presents duplicates for review and cleanup
+
+### Blur Detection (NEW!)
+Uses the Laplacian variance method to detect out-of-focus or blurry images:
+- Applies the Laplacian operator to measure edge sharpness
+- Calculates variance of the Laplacian (sharp edges = high variance)
+- **Multi-threaded batch processing** for optimal performance
+- Uses concurrent processing with up to 8 parallel workers
+- Processes multiple images simultaneously for 5-8x speed improvement
+
+**How Blur Detection Works:**
+1. **Image Loading**: Reads image in grayscale for faster processing
+2. **Laplacian Operator**: Calculates second derivative to detect edges
+3. **Variance Calculation**: Sharp images have high variance, blurry images have low variance
+4. **Threshold Comparison**: Scores below threshold are classified as blurry
+5. **Quality Categorization**: Assigns quality level based on score ranges
+
+**Blur Score Interpretation:**
+- **>500**: Excellent - Very sharp with fine detail
+- **250-500**: Good - Sharp with good detail
+- **100-250**: Fair - Acceptable sharpness
+- **50-100**: Poor - Noticeable blur
+- **<50**: Very Blurry - Significantly out of focus
+
+**Parallel Processing:**
+- Utilizes CPU cores efficiently (up to 8 workers)
+- Processes multiple images concurrently
+- Progress updates in real-time as tasks complete
+- Dramatically faster than sequential processing
 
 ## AI-Human Collaborative Development Process
 
@@ -280,8 +325,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - GitHub Copilot and OpenAI for AI development assistance
 - CLIP model by OpenAI for image classification
+- OpenCV for computer vision and blur detection algorithms
 - PyTorch and torchvision teams
 - Tkinter for the GUI framework
+- Python's concurrent.futures for efficient parallel processing
 
 Special thanks to the AI research community for advancing the field of AI-assisted software development and making projects like this possible. This project stands as a testament to the potential of human-AI collaboration in creating robust, efficient software solutions.
 

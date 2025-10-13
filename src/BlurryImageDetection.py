@@ -8,6 +8,8 @@ import cv2
 import numpy as np
 from PIL import Image
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
 
 
 class BlurryImageDetector:
@@ -102,6 +104,94 @@ class BlurryImageDetector:
             return "Poor"
         else:
             return "Very Blurry"
+
+
+def detect_blurry_images_batch(folder_path, threshold=100.0, progress_callback=None, batch_size=10, max_workers=None):
+    """
+    Scan a folder for blurry images using parallel batch processing for better performance.
+    
+    Args:
+        folder_path (str): Path to the folder containing images
+        threshold (float): Blur detection threshold
+        progress_callback (callable): Optional callback function(current, total, filename)
+        batch_size (int): Number of images to process in each batch
+        max_workers (int): Maximum number of parallel workers (default: CPU count)
+        
+    Returns:
+        dict: {
+            'blurry_images': [(path, score), ...],
+            'sharp_images': [(path, score), ...],
+            'total_processed': int,
+            'total_blurry': int
+        }
+    """
+    detector = BlurryImageDetector(threshold=threshold)
+    
+    # Supported image extensions
+    image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
+    
+    # Find all images
+    image_files = []
+    for ext in image_extensions:
+        image_files.extend(Path(folder_path).rglob(f'*{ext}'))
+        image_files.extend(Path(folder_path).rglob(f'*{ext.upper()}'))
+    
+    blurry_images = []
+    sharp_images = []
+    total = len(image_files)
+    processed = 0
+    
+    # Use CPU count if max_workers not specified
+    if max_workers is None:
+        max_workers = min(multiprocessing.cpu_count(), 8)  # Cap at 8 to avoid overhead
+    
+    def process_single_image(image_path):
+        """Process a single image and return result"""
+        try:
+            is_blurry, score = detector.is_blurry(str(image_path))
+            return (str(image_path), score, is_blurry)
+        except Exception as e:
+            print(f"Error processing {image_path}: {e}")
+            return (str(image_path), -1, False)
+    
+    # Process images in parallel batches
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_path = {executor.submit(process_single_image, img_path): img_path 
+                         for img_path in image_files}
+        
+        # Process completed tasks as they finish
+        for future in as_completed(future_to_path):
+            img_path = future_to_path[future]
+            try:
+                path_str, score, is_blurry = future.result()
+                
+                if score != -1:  # Successfully processed
+                    if is_blurry:
+                        blurry_images.append((path_str, score))
+                    else:
+                        sharp_images.append((path_str, score))
+                
+                processed += 1
+                
+                # Update progress
+                if progress_callback:
+                    progress_callback(processed, total, img_path.name)
+                    
+            except Exception as e:
+                print(f"Error processing result for {img_path}: {e}")
+                processed += 1
+    
+    # Sort by blur score (most blurry first for blurry_images, sharpest first for sharp_images)
+    blurry_images.sort(key=lambda x: x[1])  # Lowest score (most blurry) first
+    sharp_images.sort(key=lambda x: x[1], reverse=True)  # Highest score (sharpest) first
+    
+    return {
+        'blurry_images': blurry_images,
+        'sharp_images': sharp_images,
+        'total_processed': len(blurry_images) + len(sharp_images),
+        'total_blurry': len(blurry_images)
+    }
 
 
 def detect_blurry_images(folder_path, threshold=100.0, progress_callback=None):
