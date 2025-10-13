@@ -369,13 +369,18 @@ class BlurryImageDetectionApp:
         self.zoom_label.config(text=f"{zoom_percent}%")
 
     def _get_image_count(self, folder_path):
-        """Quickly count the number of images in a folder."""
+        """Quickly count the number of images in a folder, excluding Trash."""
         image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
         count = 0
         try:
             for ext in image_extensions:
-                count += len(list(Path(folder_path).rglob(f'*{ext}')))
-                count += len(list(Path(folder_path).rglob(f'*{ext.upper()}')))
+                # Get all matching files and exclude Trash folder
+                for img_path in Path(folder_path).rglob(f'*{ext}'):
+                    if 'Trash' not in img_path.parts:
+                        count += 1
+                for img_path in Path(folder_path).rglob(f'*{ext.upper()}'):
+                    if 'Trash' not in img_path.parts:
+                        count += 1
             return count
         except Exception as e:
             print(f"Error counting images: {e}")
@@ -390,6 +395,8 @@ class BlurryImageDetectionApp:
             self.folder = folder
             self.lbl_folder.config(text=folder)
             self.status_bar.set_text(f"Selected folder: {folder}")
+            # Update trash count when folder is selected
+            self.trash_manager.update_trash_count()
 
     def start_scan(self):
         if not self.folder:
@@ -672,39 +679,168 @@ class BlurryImageDetectionApp:
         self.update_select_all_button_text()
 
     def clean_selected_photos(self):
+        # Prevent concurrent cleaning operations
+        if self._cleaning_in_progress:
+            return
+        
         selected_paths = [path for var, path in self.selected_check_vars if var.get()]
         if not selected_paths:
-            messagebox.showinfo("Clean", "No photos selected to clean.")
+            messagebox.showinfo("Clean", "No photos selected.")
             return
 
         if not self.folder:
-            messagebox.showerror("Error", "Base folder not set.")
+            messagebox.showerror("Error", "No folder selected.")
             return
 
-        confirm = messagebox.askyesno("Confirm Clean", 
-            f"Are you sure you want to move {len(selected_paths)} photos to the trash?")
-        if not confirm:
-            return
-
+        # Set cleaning flag
         self._cleaning_in_progress = True
-        self.status_bar.set_text("Cleaning selected photos...")
         
-        moved_count = 0
+        # Create Trash directory if it doesn't exist
+        trash_dir = os.path.join(self.folder, "Trash")
         try:
-            for path in selected_paths:
-                self.trash_manager.move_to_trash(path, self.folder)
-                moved_count += 1
+            os.makedirs(trash_dir, exist_ok=True)
         except Exception as e:
-            messagebox.showerror("Error", f"An error occurred during cleaning: {e}")
+            messagebox.showerror("Error", f"Failed to create Trash directory:\n{str(e)}")
+            self._cleaning_in_progress = False
+            return
         
-        self.status_bar.set_text(f"Successfully moved {moved_count} photos to trash.")
-        self._cleaning_in_progress = False
+        # Move files to trash
+        moved_count = 0
+        failed_files = []
         
-        # Refresh the view
-        self.on_scan_complete({
-            'blurry_images': [(p, s) for p, s in self.blurry_images if p not in selected_paths],
-            'sharp_images': [(p, s) for p, s in self.sharp_images if p not in selected_paths],
-        })
+        for img_path in selected_paths:
+            try:
+                # Generate unique filename in case of duplicates
+                base_name = os.path.basename(img_path)
+                name, ext = os.path.splitext(base_name)
+                target_path = os.path.join(trash_dir, base_name)
+                counter = 1
+                
+                while os.path.exists(target_path):
+                    target_path = os.path.join(trash_dir, f"{name}_{counter}{ext}")
+                    counter += 1
+                
+                # Move the file
+                shutil.move(img_path, target_path)
+                moved_count += 1
+                
+            except Exception as e:
+                print(f"Failed to move {img_path}: {str(e)}")
+                failed_files.append(os.path.basename(img_path))
+        
+        # Show professional popup message
+        try:
+            popup = tk.Toplevel()
+            popup.title("Operation Status")
+            
+            # Make the window float on top
+            popup.lift()
+            popup.attributes('-topmost', True)
+            
+            # Enhanced window setup
+            window_width = 380
+            window_height = 150
+            
+            # Get the position of the main window
+            main_window_x = self.root.winfo_x()
+            main_window_y = self.root.winfo_y()
+            main_window_width = self.root.winfo_width()
+            main_window_height = self.root.winfo_height()
+            
+            # Calculate position (centered on main window)
+            position_x = main_window_x + (main_window_width - window_width) // 2
+            position_y = main_window_y + (main_window_height - window_height) // 2
+            
+            # Set window geometry
+            popup.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
+            
+            # Configure window style
+            popup.configure(bg='#ffffff')
+            popup.overrideredirect(True)  # Remove window decorations
+            
+            # Create main container with border
+            border_frame = tk.Frame(popup, bg='#e2e8f0', padx=1, pady=1)
+            border_frame.pack(fill=tk.BOTH, expand=True)
+            
+            main_frame = tk.Frame(border_frame, bg='#ffffff')
+            main_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Header bar
+            header_frame = tk.Frame(main_frame, bg='#f8fafc', height=32)
+            header_frame.pack(fill=tk.X)
+            header_frame.pack_propagate(False)
+            
+            header_label = tk.Label(header_frame, text="Operation Complete",
+                                  bg='#f8fafc', fg='#334155',
+                                  font=("Segoe UI", 11, "bold"))
+            header_label.pack(side=tk.LEFT, padx=15, pady=6)
+            
+            # Content frame with padding
+            content_frame = tk.Frame(main_frame, bg='#ffffff', padx=20, pady=15)
+            content_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Status icon and colors
+            if failed_files:
+                icon = "⚠"
+                title = "Partial Success"
+                icon_color = "#dc2626"  # Red
+                message = f"Moved {moved_count} photos to Trash\n"
+                if len(failed_files) > 0:
+                    message += f"Failed to move {len(failed_files)} files"
+            else:
+                icon = "✓"
+                title = "Success"
+                icon_color = "#0369a1"  # Blue
+                message = f"Successfully moved {moved_count} photos to Trash"
+            
+            # Icon
+            icon_label = tk.Label(content_frame, text=icon, bg='#ffffff',
+                                fg=icon_color, font=("Segoe UI", 24))
+            icon_label.pack(pady=(0, 5))
+            
+            # Title
+            title_label = tk.Label(content_frame, text=title, bg='#ffffff',
+                                 fg=icon_color, font=("Segoe UI", 12, "bold"))
+            title_label.pack(pady=(0, 8))
+            
+            # Message
+            msg_label = tk.Label(content_frame, text=message, bg='#ffffff',
+                               fg='#475569', font=("Segoe UI", 11))
+            msg_label.pack()
+            
+            # Force the window to update and show
+            popup.update()
+            
+            # Add subtle fade out before destruction
+            def fade_out():
+                for i in range(10):
+                    opacity = 1.0 - (i / 10)
+                    popup.attributes('-alpha', opacity)
+                    popup.update()
+                    popup.after(50)
+                popup.destroy()
+            
+            # Schedule fade out and destruction
+            popup.after(1500, fade_out)
+            
+        except Exception as e:
+            print(f"Error showing popup: {str(e)}")
+            messagebox.showinfo("Clean Complete", 
+                              f"Moved {moved_count} photos to Trash")
+        
+        # Refresh UI
+        try:
+            # Update trash count
+            self.trash_manager.update_trash_count()
+            
+            # Refresh the view - remove moved photos from the lists
+            self.on_scan_complete({
+                'blurry_images': [(p, s) for p, s in self.blurry_images if p not in selected_paths],
+                'sharp_images': [(p, s) for p, s in self.sharp_images if p not in selected_paths],
+            })
+        finally:
+            # Reset cleaning flag
+            self._cleaning_in_progress = False
 
     def open_full_image(self, path):
         ImageUtils.open_full_image(self.root, path)

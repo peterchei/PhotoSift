@@ -130,12 +130,18 @@ def detect_blurry_images_batch(folder_path, threshold=100.0, progress_callback=N
     # Supported image extensions
     image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
     
-    # Find all images
-    image_files = []
+    # Find all images, excluding Trash folder
+    # Use a set to avoid duplicates (e.g., same file found as .jpg and .JPG)
+    image_files_set = set()
     for ext in image_extensions:
-        image_files.extend(Path(folder_path).rglob(f'*{ext}'))
-        image_files.extend(Path(folder_path).rglob(f'*{ext.upper()}'))
+        for img_path in Path(folder_path).rglob(f'*{ext}'):
+            if 'Trash' not in img_path.parts:
+                image_files_set.add(img_path)
+        for img_path in Path(folder_path).rglob(f'*{ext.upper()}'):
+            if 'Trash' not in img_path.parts:
+                image_files_set.add(img_path)
     
+    image_files = list(image_files_set)
     blurry_images = []
     sharp_images = []
     total = len(image_files)
@@ -216,12 +222,18 @@ def detect_blurry_images(folder_path, threshold=100.0, progress_callback=None):
     # Supported image extensions
     image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
     
-    # Find all images
-    image_files = []
+    # Find all images, excluding Trash folder
+    # Use a set to avoid duplicates (e.g., same file found as .jpg and .JPG)
+    image_files_set = set()
     for ext in image_extensions:
-        image_files.extend(Path(folder_path).rglob(f'*{ext}'))
-        image_files.extend(Path(folder_path).rglob(f'*{ext.upper()}'))
+        for img_path in Path(folder_path).rglob(f'*{ext}'):
+            if 'Trash' not in img_path.parts:
+                image_files_set.add(img_path)
+        for img_path in Path(folder_path).rglob(f'*{ext.upper()}'):
+            if 'Trash' not in img_path.parts:
+                image_files_set.add(img_path)
     
+    image_files = list(image_files_set)
     blurry_images = []
     sharp_images = []
     total = len(image_files)
