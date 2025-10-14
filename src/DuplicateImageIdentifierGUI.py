@@ -19,6 +19,8 @@ class DuplicateImageIdentifierApp:
         
         self.folder = None
         self.groups = []
+        self.embeddings = {}  # Store embeddings for re-grouping with different thresholds
+        self.files = []  # Store file list for re-grouping
         
         # Selection and confidence tracking
         self.selected_check_vars = []  # List of (checkbox_var, image_path, img_canvas) tuples
@@ -131,6 +133,48 @@ class DuplicateImageIdentifierApp:
                                   wraplength=240,
                                   justify=tk.LEFT)
         self.lbl_folder.pack(anchor="w", pady=(10, 0))
+        
+        # Similarity Threshold control
+        threshold_section = tk.Frame(sidebar, bg=self.colors['bg_secondary'])
+        threshold_section.pack(fill=tk.X, padx=20, pady=(15, 0))
+        
+        tk.Label(threshold_section, text="Similarity Threshold", 
+                 font=("Segoe UI", 12, "bold"),
+                 bg=self.colors['bg_secondary'], fg=self.colors['text_primary']).pack(anchor="w")
+        
+        self.threshold_var = tk.DoubleVar(value=0.95)
+        self.threshold_slider = ttk.Scale(threshold_section, from_=0.80, to=0.99, 
+                                          orient=tk.HORIZONTAL, variable=self.threshold_var,
+                                          command=self.update_threshold_label)
+        self.threshold_slider.pack(fill=tk.X, pady=(5, 0))
+        ToolTip(self.threshold_slider, 
+                "Adjust similarity threshold for grouping duplicates.\n"
+                "Higher values (0.95-0.99): Only very similar images\n"
+                "Lower values (0.80-0.90): Include more loosely similar images")
+        
+        self.lbl_threshold = tk.Label(threshold_section, text="Current: 95%",
+                                      bg=self.colors['bg_secondary'], fg=self.colors['text_secondary'],
+                                      font=("Segoe UI", 10))
+        self.lbl_threshold.pack(anchor="w")
+        
+        # Threshold quality guide
+        threshold_guide_frame = tk.Frame(threshold_section, bg=self.colors['bg_secondary'])
+        threshold_guide_frame.pack(fill=tk.X, pady=(5, 0))
+        
+        guide_text = "• 98-99%: Identical images\n• 95-97%: Near duplicates\n• 90-94%: Similar images\n• 80-89%: Loosely related"
+        tk.Label(threshold_guide_frame, text=guide_text,
+                font=("Segoe UI", 8),
+                bg=self.colors['bg_secondary'], fg=self.colors['text_secondary'],
+                justify=tk.LEFT).pack(anchor="w")
+        
+        # Re-group button (shown only after initial scan)
+        self.regroup_btn = ModernButton.create_secondary_button(
+            threshold_section, "Re-group with New Threshold", self.regroup_duplicates, self.colors)
+        self.regroup_btn.pack(fill=tk.X, pady=(10, 0))
+        self.regroup_btn.pack_forget()  # Hide initially until first scan completes
+        ToolTip(self.regroup_btn, 
+                "Re-analyze duplicates with the current threshold.\n"
+                "This is fast since images don't need to be re-processed.")
         
         # Groups section
         groups_section = tk.Frame(sidebar, bg=self.colors['bg_secondary'])
@@ -299,6 +343,91 @@ class DuplicateImageIdentifierApp:
     def close_progress(self):
         """Close progress window using common component"""
         self.progress_window.close()
+    
+    def update_threshold_label(self, value):
+        """Update threshold label when slider moves"""
+        percentage = int(float(value) * 100)
+        self.lbl_threshold.config(text=f"Current: {percentage}%")
+    
+    def regroup_duplicates(self):
+        """Re-group duplicates using the current threshold without re-extracting embeddings"""
+        if not self.embeddings or not self.files:
+            messagebox.showinfo("No Data", "Please scan a folder first before re-grouping.")
+            return
+        
+        if not self.folder:
+            messagebox.showinfo("No Folder", "Please select a folder first.")
+            return
+        
+        threshold = self.threshold_var.get()
+        threshold_percent = int(threshold * 100)
+        total = len(self.files)
+        
+        # Show progress window
+        self.show_progress_window(total)
+        self.update_progress(0, total, f"Re-grouping with {threshold_percent}% threshold...", 
+                           "Using cached embeddings for fast re-grouping...")
+        
+        # Process in thread
+        import threading
+        def process():
+            try:
+                from DuplicateImageIdentifier import group_similar_images_clip
+                
+                # Update status bar
+                self.root.after(0, self.status_bar.set_text, f"Re-grouping duplicates at {threshold_percent}% similarity...")
+                
+                # Define progress callback for duplicate detection
+                def duplicate_progress_callback(current, total_imgs, status_text, detail_text):
+                    self.root.after(0, self.update_progress, current, total_imgs, status_text, detail_text)
+                    percent = int((current / total_imgs) * 100) if total_imgs > 0 else 100
+                    status_bar_text = f"Re-grouping: {current}/{total_imgs} ({percent}%)"
+                    self.root.after(0, self.status_bar.set_text, status_bar_text)
+                
+                # Re-group using cached embeddings with new threshold
+                result = group_similar_images_clip(folder=self.folder, threshold=threshold, 
+                                                 embeddings=self.embeddings, files=self.files, 
+                                                 progress_callback=duplicate_progress_callback, 
+                                                 return_scores=True)
+                if isinstance(result, tuple):
+                    self.groups, self.similarity_scores = result
+                else:
+                    # Fallback for older version
+                    self.groups = result
+                    self.similarity_scores = {}
+                
+                # Update final status
+                total_duplicates = sum(len(group) - 1 for group in self.groups)
+                final_status = f"Re-grouping Complete! Found {len(self.groups)} images with duplicates (≥{threshold_percent}% similarity)"
+                final_detail = f"Analyzed {total} images - {total_duplicates} total duplicates found"
+                self.update_progress(total, total, final_status, final_detail)
+                
+                # Update status bar with final result
+                final_status_text = f"Done! {len(self.groups)} images have duplicates ({total_duplicates} total) at {threshold_percent}% similarity threshold"
+                self.root.after(0, self.status_bar.set_text, final_status_text)
+                self.root.after(0, self.status_bar.set_color, "#33cc33", "white")
+                
+                # Update main UI
+                self.populate_tree()
+                
+                # Close progress window after a short delay
+                self.root.after(2000, self.close_progress)
+                
+            except Exception as e:
+                # Handle errors gracefully
+                error_msg = f"Error during re-grouping: {str(e)}"
+                print(f"[ERROR] {error_msg}")
+                
+                self.update_progress(0, total, "Re-grouping Failed", error_msg)
+                
+                # Update status bar with error
+                self.root.after(0, self.status_bar.set_text, f"Re-grouping failed: {str(e)}")
+                self.root.after(0, self.status_bar.set_color, "#cc3333", "white")
+                
+                # Close progress window after error
+                self.root.after(3000, self.close_progress)
+        
+        threading.Thread(target=process, daemon=True).start()
 
     def get_similarity_tooltip(self, similarity_score):
         """Generate tooltip text for similarity scores"""
@@ -435,6 +564,9 @@ class DuplicateImageIdentifierApp:
             # Show progress window
             self.show_progress_window(total)
             
+            # Get the threshold value from slider
+            threshold = self.threshold_var.get()
+            
             # Process in thread
             import threading
             def process():
@@ -468,6 +600,10 @@ class DuplicateImageIdentifierApp:
                             print(f"Error processing batch {start}-{end}: {e}")
                             continue
                     
+                    # Store embeddings and files for re-grouping
+                    self.embeddings = embeddings
+                    self.files = files
+                    
                     # Update progress for duplicate detection phase
                     self.update_progress(total, total, "Identifying Duplicates...", 
                                        "Comparing image similarities and grouping duplicates...")
@@ -480,8 +616,9 @@ class DuplicateImageIdentifierApp:
                         status_bar_text = f"Identifying duplicates: {current}/{total_imgs} ({percent}%)"
                         self.root.after(0, self.status_bar.set_text, status_bar_text)
                     
-                    # Get groups and similarity scores
-                    result = group_similar_images_clip(folder=folder, embeddings=embeddings, files=files, 
+                    # Get groups and similarity scores with user-specified threshold
+                    result = group_similar_images_clip(folder=folder, threshold=threshold, 
+                                                     embeddings=embeddings, files=files, 
                                                      progress_callback=duplicate_progress_callback, 
                                                      return_scores=True)
                     if isinstance(result, tuple):
@@ -493,17 +630,21 @@ class DuplicateImageIdentifierApp:
                     
                     # Update final status
                     total_duplicates = sum(len(group) - 1 for group in self.groups)
-                    final_status = f"Complete! Found {len(self.groups)} images with duplicates"
+                    threshold_percent = int(threshold * 100)
+                    final_status = f"Complete! Found {len(self.groups)} images with duplicates (≥{threshold_percent}% similarity)"
                     final_detail = f"Processed {total} images - {total_duplicates} total duplicates found"
                     self.update_progress(total, total, final_status, final_detail)
                     
                     # Update status bar with final result
-                    final_status_text = f"Done! {len(self.groups)} images have duplicates ({total_duplicates} total) from {total} images (100%)"
+                    final_status_text = f"Done! {len(self.groups)} images have duplicates ({total_duplicates} total) at {threshold_percent}% similarity threshold"
                     self.root.after(0, self.status_bar.set_text, final_status_text)
                     self.root.after(0, self.status_bar.set_color, "#33cc33", "white")
                     
                     # Update main UI
                     self.populate_tree()
+                    
+                    # Show re-group button after successful scan
+                    self.root.after(0, self.regroup_btn.pack, {'fill': tk.X, 'pady': (10, 0)})
                     
                     # Close progress window after a short delay
                     self.root.after(2000, self.close_progress)
