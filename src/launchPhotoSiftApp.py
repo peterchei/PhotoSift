@@ -386,7 +386,7 @@ def show_app_selection():
     # Center window
     selection_window.update_idletasks()
     x = (selection_window.winfo_screenwidth() // 2) - (500 // 2)
-    y = (selection_window.winfo_screenheight() // 2) - (250 // 2)
+    y = (selection_window.winfo_screenheight() // 2) - (300 // 2)
     selection_window.geometry(f"500x300+{x}+{y}")
     
     # Create main frame (also draggable)
@@ -415,37 +415,55 @@ def show_app_selection():
     button_frame.pack(fill=tk.X, pady=5)
     
     def launch_classifier():
-        """Launch ImageClassifierGUI and close selection window"""
-        selection_window.destroy()
+        """Launch ImageClassifierGUI and destroy selection window"""
+        selection_window.destroy()  # Completely destroy to avoid conflicts
         try:
             from ImageClassifierGUI import ImageClassifierApp
-            root = tk.Tk()
-            app = ImageClassifierApp(root)
-            root.mainloop()
+            # Create a new Tk instance
+            app_root = tk.Tk()
+            app = ImageClassifierApp(app_root)
+            app_root.mainloop()
+            # After app closes, show selection again
+            show_app_selection()
         except Exception as e:
             print(f"Error launching ImageClassifierGUI: {e}")
+            import traceback
+            traceback.print_exc()
+            show_app_selection()
     
     def launch_duplicate_finder():
-        """Launch DuplicateImageIdentifierGUI and close selection window"""
-        selection_window.destroy()
+        """Launch DuplicateImageIdentifierGUI and destroy selection window"""
+        selection_window.destroy()  # Completely destroy to avoid conflicts
         try:
             from DuplicateImageIdentifierGUI import DuplicateImageIdentifierApp
-            root = tk.Tk()
-            app = DuplicateImageIdentifierApp(root)
-            root.mainloop()
+            # Create a new Tk instance
+            app_root = tk.Tk()
+            app = DuplicateImageIdentifierApp(app_root)
+            app_root.mainloop()
+            # After app closes, show selection again
+            show_app_selection()
         except Exception as e:
             print(f"Error launching DuplicateImageIdentifierGUI: {e}")
+            import traceback
+            traceback.print_exc()
+            show_app_selection()
 
     def launch_blurry_detector():
-        """Launch BlurryImageDetectionGUI and close selection window"""
-        selection_window.destroy()
+        """Launch BlurryImageDetectionGUI and destroy selection window"""
+        selection_window.destroy()  # Completely destroy to avoid conflicts
         try:
             from BlurryImageDetectionGUI import BlurryImageDetectionApp
-            root = tk.Tk()
-            app = BlurryImageDetectionApp(root)
-            root.mainloop()
+            # Create a new Tk instance
+            app_root = tk.Tk()
+            app = BlurryImageDetectionApp(app_root)
+            app_root.mainloop()
+            # After app closes, show selection again
+            show_app_selection()
         except Exception as e:
             print(f"Error launching BlurryImageDetectionGUI: {e}")
+            import traceback
+            traceback.print_exc()
+            show_app_selection()
     
     # Identify unwanted photo button
     unwanted_btn = tk.Button(button_frame,
@@ -491,6 +509,12 @@ def show_app_selection():
                              padx=20, pady=5,
                              height=1)
     blurry_btn.pack(pady=5, fill=tk.X)
+    
+    # Ensure window is visible and on top
+    selection_window.lift()
+    selection_window.focus_force()
+    selection_window.attributes('-topmost', True)
+    selection_window.after(100, lambda: selection_window.attributes('-topmost', False))
     
     # Start the selection window
     selection_window.mainloop()
