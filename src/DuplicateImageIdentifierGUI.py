@@ -134,6 +134,14 @@ class DuplicateImageIdentifierApp:
                                   justify=tk.LEFT)
         self.lbl_folder.pack(anchor="w", pady=(10, 0))
         
+        # Image count display
+        self.lbl_image_count = tk.Label(folder_section, 
+                                        text="", 
+                                        font=("Segoe UI", 9),
+                                        bg=self.colors['bg_secondary'], 
+                                        fg=self.colors['text_secondary'])
+        self.lbl_image_count.pack(anchor="w", pady=(5, 0))
+        
         # Similarity Threshold control
         threshold_section = tk.Frame(sidebar, bg=self.colors['bg_secondary'])
         threshold_section.pack(fill=tk.X, padx=20, pady=(15, 0))
@@ -166,6 +174,13 @@ class DuplicateImageIdentifierApp:
                 font=("Segoe UI", 8),
                 bg=self.colors['bg_secondary'], fg=self.colors['text_secondary'],
                 justify=tk.LEFT).pack(anchor="w")
+        
+        # Scan button
+        self.scan_btn = ModernButton.create_primary_button(
+            threshold_section, "Start Scan", self.start_scan, self.colors)
+        self.scan_btn.pack(fill=tk.X, pady=(15, 0))
+        self.scan_btn.config(state=tk.DISABLED)  # Disabled until folder is selected
+        ToolTip(self.scan_btn, "Begin scanning for duplicate images in the selected folder")
         
         # Re-group button (shown only after initial scan)
         self.regroup_btn = ModernButton.create_secondary_button(
@@ -521,6 +536,7 @@ class DuplicateImageIdentifierApp:
             self.duplications_label.config(text="Duplications")
 
     def select_folder(self):
+        """Select a folder and count images, but don't start scanning yet"""
         folder = filedialog.askdirectory()
         if folder:
             # Clear cache when selecting new folder to free memory
@@ -539,7 +555,20 @@ class DuplicateImageIdentifierApp:
             # Clear tree
             self.tree.delete(*self.tree.get_children())
             
-            # Get all image files first, excluding Trash folder
+            # Clear image panel
+            for widget in self.img_panel.winfo_children():
+                widget.destroy()
+            
+            # Clear any previous scan data
+            self.groups = []
+            self.embeddings = {}
+            self.files = []
+            self.similarity_scores = {}
+            
+            # Hide re-group button until scan completes
+            self.regroup_btn.pack_forget()
+            
+            # Count image files (excluding Trash folder)
             files = []
             for dp, dn, filenames in os.walk(folder):
                 # Skip the Trash directory and its subdirectories
@@ -554,116 +583,147 @@ class DuplicateImageIdentifierApp:
             
             if total == 0:
                 self.status_bar.set_text("No images found in selected folder")
+                self.lbl_image_count.config(text="No images found", fg=self.colors['danger'])
+                self.scan_btn.config(state=tk.DISABLED)
                 messagebox.showinfo("No Images", "No images found in the selected folder.")
                 return
             
-            # Clear image panel
-            for widget in self.img_panel.winfo_children():
-                widget.destroy()
-            
-            # Show progress window
-            self.show_progress_window(total)
-            
-            # Get the threshold value from slider
-            threshold = self.threshold_var.get()
-            
-            # Process in thread
-            import threading
-            def process():
-                try:
-                    from DuplicateImageIdentifier import get_clip_embedding_batch, group_similar_images_clip
-                    embeddings = {}
-                    batch_size = 64
-                    
-                    # Process images in batches
-                    for start in range(0, total, batch_size):
-                        end = min(start + batch_size, total)
-                        batch_files = files[start:end]
-                        percent = int((end/total)*100) if total else 100
-                        
-                        print(f"[LOG] Processing images {start+1}-{end}/{total} ({percent}%)")
-                        
-                        # Update progress window and status bar
-                        status_text = f"Processing Images ({percent}%)"
-                        detail_text = f"Analyzing batch {start+1}-{end} of {total} images..."
-                        self.update_progress(end, total, status_text, detail_text)
-                        
-                        # Update status bar
-                        status_bar_text = f"Processing images {start+1}-{end}/{total} ({percent}%)"
-                        self.root.after(0, self.status_bar.set_text, status_bar_text)
-                        
-                        try:
-                            batch_embeddings = get_clip_embedding_batch(batch_files)
-                            for f, emb in zip(batch_files, batch_embeddings):
-                                embeddings[f] = emb
-                        except Exception as e:
-                            print(f"Error processing batch {start}-{end}: {e}")
-                            continue
-                    
-                    # Store embeddings and files for re-grouping
-                    self.embeddings = embeddings
-                    self.files = files
-                    
-                    # Update progress for duplicate detection phase
-                    self.update_progress(total, total, "Identifying Duplicates...", 
-                                       "Comparing image similarities and grouping duplicates...")
-                    self.root.after(0, self.status_bar.set_text, "Identifying duplicate groups...")
-                    
-                    # Define progress callback for duplicate detection
-                    def duplicate_progress_callback(current, total_imgs, status_text, detail_text):
-                        self.root.after(0, self.update_progress, current, total_imgs, status_text, detail_text)
-                        percent = int((current / total_imgs) * 100) if total_imgs > 0 else 100
-                        status_bar_text = f"Identifying duplicates: {current}/{total_imgs} ({percent}%)"
-                        self.root.after(0, self.status_bar.set_text, status_bar_text)
-                    
-                    # Get groups and similarity scores with user-specified threshold
-                    result = group_similar_images_clip(folder=folder, threshold=threshold, 
-                                                     embeddings=embeddings, files=files, 
-                                                     progress_callback=duplicate_progress_callback, 
-                                                     return_scores=True)
-                    if isinstance(result, tuple):
-                        self.groups, self.similarity_scores = result
-                    else:
-                        # Fallback for older version
-                        self.groups = result
-                        self.similarity_scores = {}
-                    
-                    # Update final status
-                    total_duplicates = sum(len(group) - 1 for group in self.groups)
-                    threshold_percent = int(threshold * 100)
-                    final_status = f"Complete! Found {len(self.groups)} images with duplicates (≥{threshold_percent}% similarity)"
-                    final_detail = f"Processed {total} images - {total_duplicates} total duplicates found"
-                    self.update_progress(total, total, final_status, final_detail)
-                    
-                    # Update status bar with final result
-                    final_status_text = f"Done! {len(self.groups)} images have duplicates ({total_duplicates} total) at {threshold_percent}% similarity threshold"
-                    self.root.after(0, self.status_bar.set_text, final_status_text)
-                    self.root.after(0, self.status_bar.set_color, "#33cc33", "white")
-                    
-                    # Update main UI
-                    self.populate_tree()
-                    
-                    # Show re-group button after successful scan
-                    self.root.after(0, self.regroup_btn.pack, {'fill': tk.X, 'pady': (10, 0)})
-                    
-                    # Close progress window after a short delay
-                    self.root.after(2000, self.close_progress)
-                    
-                except Exception as e:
-                    # Handle errors gracefully
-                    error_msg = f"Error during processing: {str(e)}"
-                    print(f"[ERROR] {error_msg}")
-                    
-                    self.update_progress(0, total, "Processing Failed", error_msg)
-                    
-                    # Update status bar with error
-                    self.root.after(0, self.status_bar.set_text, f"Processing failed: {str(e)}")
-                    self.root.after(0, self.status_bar.set_color, "#cc3333", "white")
-                    
-                    # Close progress window after error
-                    self.root.after(3000, self.close_progress)
+            # Show image count and enable scan button
+            self.lbl_image_count.config(text=f"Found {total} images", fg=self.colors['success'])
+            self.scan_btn.config(state=tk.NORMAL)
+            self.status_bar.set_text(f"Ready to scan {total} images - Click 'Start Scan' to begin")
+    
+    def start_scan(self):
+        """Start scanning the selected folder for duplicates"""
+        if not self.folder:
+            messagebox.showerror("Error", "Please select a folder first.")
+            return
+        
+        # Get all image files (excluding Trash folder)
+        files = []
+        for dp, dn, filenames in os.walk(self.folder):
+            # Skip the Trash directory and its subdirectories
+            if "Trash" in dp.split(os.sep):
+                continue
                 
-            threading.Thread(target=process, daemon=True).start()
+            # Add valid images to the list
+            for f in filenames:
+                if os.path.splitext(f)[1].lower() in IMG_EXT:
+                    files.append(os.path.join(dp, f))
+        total = len(files)
+        
+        if total == 0:
+            self.status_bar.set_text("No images found in selected folder")
+            messagebox.showinfo("No Images", "No images found in the selected folder.")
+            return
+        
+        # Clear image panel
+        for widget in self.img_panel.winfo_children():
+            widget.destroy()
+        
+        # Show progress window
+        self.show_progress_window(total)
+        
+        # Get the threshold value from slider
+        threshold = self.threshold_var.get()
+        
+        # Process in thread
+        import threading
+        def process():
+            try:
+                from DuplicateImageIdentifier import get_clip_embedding_batch, group_similar_images_clip
+                embeddings = {}
+                batch_size = 64
+                
+                # Process images in batches
+                for start in range(0, total, batch_size):
+                    end = min(start + batch_size, total)
+                    batch_files = files[start:end]
+                    percent = int((end/total)*100) if total else 100
+                    
+                    print(f"[LOG] Processing images {start+1}-{end}/{total} ({percent}%)")
+                    
+                    # Update progress window and status bar
+                    status_text = f"Processing Images ({percent}%)"
+                    detail_text = f"Analyzing batch {start+1}-{end} of {total} images..."
+                    self.update_progress(end, total, status_text, detail_text)
+                    
+                    # Update status bar
+                    status_bar_text = f"Processing images {start+1}-{end}/{total} ({percent}%)"
+                    self.root.after(0, self.status_bar.set_text, status_bar_text)
+                    
+                    try:
+                        batch_embeddings = get_clip_embedding_batch(batch_files)
+                        for f, emb in zip(batch_files, batch_embeddings):
+                            embeddings[f] = emb
+                    except Exception as e:
+                        print(f"Error processing batch {start}-{end}: {e}")
+                        continue
+                
+                # Store embeddings and files for re-grouping
+                self.embeddings = embeddings
+                self.files = files
+                
+                # Update progress for duplicate detection phase
+                self.update_progress(total, total, "Identifying Duplicates...", 
+                                   "Comparing image similarities and grouping duplicates...")
+                self.root.after(0, self.status_bar.set_text, "Identifying duplicate groups...")
+                
+                # Define progress callback for duplicate detection
+                def duplicate_progress_callback(current, total_imgs, status_text, detail_text):
+                    self.root.after(0, self.update_progress, current, total_imgs, status_text, detail_text)
+                    percent = int((current / total_imgs) * 100) if total_imgs > 0 else 100
+                    status_bar_text = f"Identifying duplicates: {current}/{total_imgs} ({percent}%)"
+                    self.root.after(0, self.status_bar.set_text, status_bar_text)
+                
+                # Get groups and similarity scores with user-specified threshold
+                result = group_similar_images_clip(folder=self.folder, threshold=threshold, 
+                                                 embeddings=embeddings, files=files, 
+                                                 progress_callback=duplicate_progress_callback, 
+                                                 return_scores=True)
+                if isinstance(result, tuple):
+                    self.groups, self.similarity_scores = result
+                else:
+                    # Fallback for older version
+                    self.groups = result
+                    self.similarity_scores = {}
+                
+                # Update final status
+                total_duplicates = sum(len(group) - 1 for group in self.groups)
+                threshold_percent = int(threshold * 100)
+                final_status = f"Complete! Found {len(self.groups)} images with duplicates (≥{threshold_percent}% similarity)"
+                final_detail = f"Processed {total} images - {total_duplicates} total duplicates found"
+                self.update_progress(total, total, final_status, final_detail)
+                
+                # Update status bar with final result
+                final_status_text = f"Done! {len(self.groups)} images have duplicates ({total_duplicates} total) at {threshold_percent}% similarity threshold"
+                self.root.after(0, self.status_bar.set_text, final_status_text)
+                self.root.after(0, self.status_bar.set_color, "#33cc33", "white")
+                
+                # Update main UI
+                self.populate_tree()
+                
+                # Show re-group button after successful scan
+                self.root.after(0, self.regroup_btn.pack, {'fill': tk.X, 'pady': (10, 0)})
+                
+                # Close progress window after a short delay
+                self.root.after(2000, self.close_progress)
+                
+            except Exception as e:
+                # Handle errors gracefully
+                error_msg = f"Error during processing: {str(e)}"
+                print(f"[ERROR] {error_msg}")
+                
+                self.update_progress(0, total, "Processing Failed", error_msg)
+                
+                # Update status bar with error
+                self.root.after(0, self.status_bar.set_text, f"Processing failed: {str(e)}")
+                self.root.after(0, self.status_bar.set_color, "#cc3333", "white")
+                
+                # Close progress window after error
+                self.root.after(3000, self.close_progress)
+        
+        threading.Thread(target=process, daemon=True).start()
 
     def populate_tree(self):
         import time
