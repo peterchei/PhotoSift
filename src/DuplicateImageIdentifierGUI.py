@@ -425,6 +425,9 @@ class DuplicateImageIdentifierApp:
                 # Update main UI
                 self.populate_tree()
                 
+                # Automatically select all groups in tree view to display results
+                self.root.after(100, self.auto_select_all_groups)
+                
                 # Close progress window after a short delay
                 self.root.after(2000, self.close_progress)
                 
@@ -534,6 +537,27 @@ class DuplicateImageIdentifierApp:
             self.duplications_label.config(text=f"Duplications ({group_count})")
         else:
             self.duplications_label.config(text="Duplications")
+    
+    def auto_select_all_groups(self):
+        """Automatically select all groups in tree view after scan/regroup"""
+        if not self.tree:
+            return
+        
+        # Get all top-level group items
+        group_items = self.tree.get_children()
+        
+        # Only auto-select if there are groups (not placeholder)
+        if group_items and len(self.groups) > 0:
+            # Clear any existing selection
+            self.tree.selection_remove(self.tree.selection())
+            
+            # Select all group items
+            self.tree.selection_set(group_items)
+            
+            # Trigger the selection event to display images
+            self.on_tree_select(None)
+            
+            print(f"[LOG] Auto-selected {len(group_items)} groups in tree view")
 
     def select_folder(self):
         """Select a folder and count images, but don't start scanning yet"""
@@ -705,6 +729,9 @@ class DuplicateImageIdentifierApp:
                 
                 # Show re-group button after successful scan
                 self.root.after(0, self.regroup_btn.pack, {'fill': tk.X, 'pady': (10, 0)})
+                
+                # Automatically select all groups in tree view to display results
+                self.root.after(100, self.auto_select_all_groups)
                 
                 # Close progress window after a short delay
                 self.root.after(2000, self.close_progress)

@@ -13,12 +13,19 @@ processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 IMG_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
 def load_image_cv(path, size=(224, 224)):
-    arr = cv2.imread(path)
-    if arr is not None:
-        arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
-        arr = cv2.resize(arr, size, interpolation=cv2.INTER_AREA)
-        return Image.fromarray(arr)
-    return Image.new("RGB", size)
+    """Load image with Unicode path support (handles Chinese/special characters)"""
+    try:
+        # Use PIL to load the image first (handles Unicode paths properly)
+        img = Image.open(path).convert("RGB")
+        
+        # Resize using PIL's high-quality resampling
+        img = img.resize(size, Image.Resampling.LANCZOS)
+        
+        return img
+    except Exception as e:
+        print(f"Warning: Failed to load image {path}: {e}")
+        # Return a blank image as fallback (should rarely happen)
+        return Image.new("RGB", size)
 
 def get_clip_embedding_batch(img_paths, size=(224, 224)):
     with ThreadPoolExecutor(max_workers=16) as executor:
