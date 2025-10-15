@@ -132,7 +132,7 @@ class DuplicateImageIdentifierApp:
                                   fg=self.colors['text_secondary'],
                                   wraplength=240,
                                   justify=tk.LEFT)
-        self.lbl_folder.pack(anchor="w", pady=(10, 0))
+        self.lbl_folder.pack(anchor="w", pady=(5, 0))
         
         # Image count display
         self.lbl_image_count = tk.Label(folder_section, 
@@ -144,7 +144,7 @@ class DuplicateImageIdentifierApp:
         
         # Similarity Threshold control
         threshold_section = tk.Frame(sidebar, bg=self.colors['bg_secondary'])
-        threshold_section.pack(fill=tk.X, padx=20, pady=(15, 0))
+        threshold_section.pack(fill=tk.X, padx=20, pady=(5, 0))
         
         tk.Label(threshold_section, text="Similarity Threshold", 
                  font=("Segoe UI", 12, "bold"),
