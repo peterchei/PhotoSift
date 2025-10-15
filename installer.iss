@@ -1,5 +1,5 @@
 #define MyAppName "PhotoSift"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.3.1"
 #define MyAppPublisher "PhotoSift"
 #define MyAppURL "https://github.com/peterchei/PhotoSift"
 #define MyAppExeName "PhotoSift.exe"
@@ -18,7 +18,7 @@ DisableProgramGroupPage=yes
 ; Remove the following line to run in administrative install mode (install for all users.)
 PrivilegesRequired=lowest
 OutputBaseFilename=PhotoSift_Setup
-Compression=lzma
+Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 
