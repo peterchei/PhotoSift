@@ -22,7 +22,7 @@ from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling,
 class BlurryImageDetectionApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Blurry Image Detector")
+        self.root.title("PhotoSift - Blurry Image Detector")
         # Maximize window on startup
         self.root.state('zoomed')  # Windows maximized state
 

@@ -173,7 +173,7 @@ class ImageClassifierApp:
         self.thumb_canvas.yview_moveto(0)
     def __init__(self, root):
         self.root = root
-        self.root.title("Find Out Photo Unwanted")
+        self.root.title("PhotoSift - Unwanted Photo Identifier")
         # Maximize window on startup
         self.root.state('zoomed')  # Windows maximized state
         self.folder = None
@@ -294,7 +294,7 @@ class ImageClassifierApp:
         title_label.pack(anchor="w")
         
         subtitle_label = tk.Label(title_frame, 
-                                 text="Find Out Photo Unwanted", 
+                                 text="Unwanted Photo Identifier", 
                                  font=("Segoe UI", 14),
                                  bg=self.colors['bg_primary'], 
                                  fg=self.colors['text_secondary'])
@@ -323,17 +323,13 @@ class ImageClassifierApp:
         folder_section.pack(fill=tk.X, padx=20, pady=(20, 15))
         
         # Modern select folder button
-        select_btn = tk.Button(folder_section, 
-                              text="Select Folder", 
-                              command=self.select_folder,
-                              font=("Segoe UI", 12, "bold"),
-                              bg=self.colors['accent'],
-                              fg=self.colors['text_primary'],
-                              activebackground=self.colors['accent_hover'],
-                              activeforeground=self.colors['text_primary'],
-                              bd=0, relief=tk.FLAT, cursor="hand2",
-                              padx=20, pady=10)
+        select_btn = ModernButton.create_primary_button(
+            folder_section, 
+            text="Select Folder", 
+            command=self.select_folder,
+            colors=self.colors)
         select_btn.pack(fill=tk.X)
+        ToolTip(select_btn, "Select a folder to start classification")
         
         # Folder path display
         self.lbl_folder = tk.Label(folder_section, 
