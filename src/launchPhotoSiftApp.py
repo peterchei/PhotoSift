@@ -465,18 +465,18 @@ def show_app_selection():
     
     # Create selection window
     selection_window = tk.Tk()
-    selection_window.title("PhotoSift - Welcome! Please select a features")
+    selection_window.title("PhotoSift - Select Feature")
     selection_window.geometry("500x300")  # Increased both width and height
     selection_window.configure(bg='#1e293b')
     selection_window.resizable(False, False)
-    # Option: Minimal title bar with minimize button
-    # selection_window.overrideredirect(True)  # Remove title bar (disabled for comparison)
     
-    # Minimal title bar on Windows - removes maximize button, keeps minimize and close
+    # Set window icon
     try:
-        selection_window.attributes('-toolwindow', True)  # Minimal title bar on Windows
-    except:
-        pass  # Fallback for non-Windows systems
+        icon_path = os.path.join(os.path.dirname(__file__), "..", "resources", "app.ico")
+        if os.path.exists(icon_path):
+            selection_window.iconbitmap(icon_path)
+    except Exception as e:
+        logger.warning(f"Could not set window icon: {e}")
     
     # Center window
     selection_window.update_idletasks()
