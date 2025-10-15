@@ -22,7 +22,7 @@ def create_store_assets():
     os.makedirs(assets_dir, exist_ok=True)
     
     print("=" * 60)
-    print("Creating Microsoft Store Assets for PhotoSift v1.3.0")
+    print("Creating Microsoft Store Assets for PhotoSift v1.3.1")
     print("=" * 60)
     print()
 
