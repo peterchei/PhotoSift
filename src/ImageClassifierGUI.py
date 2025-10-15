@@ -514,15 +514,9 @@ class ImageClassifierApp:
         # Modern Select All button
         self.select_all_btn_var = tk.StringVar()
         self.select_all_btn_var.set("Select All")
-        self.select_all_btn = tk.Button(action_frame, 
-                                       textvariable=self.select_all_btn_var, 
-                                       command=self.select_all_photos,
-                                       font=("Segoe UI", 12, "bold"),
-                                       bg=self.colors['accent'],
-                                       fg=self.colors['text_primary'],
-                                       activebackground=self.colors['accent_hover'],
-                                       bd=0, relief=tk.FLAT, cursor="hand2",
-                                       padx=16, pady=8)
+        self.select_all_btn = ModernButton.create_primary_button(
+            action_frame, "", self.select_all_photos, self.colors,
+            textvariable=self.select_all_btn_var)
         self.select_all_btn.pack(side=tk.LEFT, padx=(0, 10))
         ToolTip(self.select_all_btn, 
                 "Toggle selection of all photos\n"
@@ -532,15 +526,9 @@ class ImageClassifierApp:
         # Modern Clean button
         self.clean_btn_var = tk.StringVar()
         self.clean_btn_var.set("Clean (0)")
-        self.clean_btn = tk.Button(action_frame, 
-                                  textvariable=self.clean_btn_var,
-                                  command=self.clean_selected_photos,
-                                  font=("Segoe UI", 12, "bold"),
-                                  bg=self.colors['danger'],
-                                  fg=self.colors['text_primary'],
-                                  activebackground='#dc2626',
-                                  bd=0, relief=tk.FLAT, cursor="hand2",
-                                  padx=16, pady=8)
+        self.clean_btn = ModernButton.create_danger_button(
+            action_frame, "", self.clean_selected_photos, self.colors,
+            textvariable=self.clean_btn_var)
         self.clean_btn.pack(side=tk.LEFT)
         ToolTip(self.clean_btn, 
                 "Clean selected photos from the list\n"

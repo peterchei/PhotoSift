@@ -244,12 +244,16 @@ class BlurryImageDetectionApp:
         action_frame.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.select_all_btn_var = tk.StringVar(value="Select All")
-        self.select_all_btn = ModernButton.create_secondary_button(action_frame, "", command=self.select_all_photos, colors=self.colors, textvariable=self.select_all_btn_var)
+        self.select_all_btn = ModernButton.create_primary_button(
+            action_frame, "", self.select_all_photos, self.colors,
+            textvariable=self.select_all_btn_var)
         self.select_all_btn.pack(side=tk.LEFT, padx=(0, 10))
         ToolTip(self.select_all_btn, "Toggle selection for all visible photos")
 
         self.clean_btn_var = tk.StringVar(value="Clean (0)")
-        self.clean_btn = ModernButton.create_danger_button(action_frame, "", command=self.clean_selected_photos, colors=self.colors, textvariable=self.clean_btn_var)
+        self.clean_btn = ModernButton.create_danger_button(
+            action_frame, "", self.clean_selected_photos, self.colors,
+            textvariable=self.clean_btn_var)
         self.clean_btn.pack(side=tk.LEFT, padx=(0, 10))
         ToolTip(self.clean_btn, "Move selected blurry photos to the trash")
 

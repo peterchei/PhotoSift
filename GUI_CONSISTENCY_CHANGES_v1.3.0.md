@@ -20,15 +20,25 @@ Standardizing layout, spacing, colors, and styling across all three PhotoSift GU
 
 ### 2. Button Styling - COMPLETED ✅
 
-**ImageClassifierGUI.py:**
-- Changed "Select Folder" button from direct `tk.Button` to `ModernButton.create_primary_button()`
-- Added ToolTip for consistency
+**All three GUIs now use consistent button styling:**
 
-**DuplicateImageIdentifierGUI.py:**
-- ✅ Already using ModernButton.create_primary_button()
+**Select Folder Button:**
+- All use `ModernButton.create_primary_button()` (blue accent color)
+- ✅ ImageClassifierGUI
+- ✅ DuplicateImageIdentifierGUI
+- ✅ BlurryImageDetectionGUI
 
-**BlurryImageDetectionGUI.py:**
-- ✅ Already using ModernButton.create_primary_button()
+**Select All Button:**
+- All use `ModernButton.create_primary_button()` (blue accent color)
+- Changed ImageClassifierGUI from direct `tk.Button` to `ModernButton.create_primary_button()`
+- Changed BlurryImageDetectionGUI from `create_secondary_button` (gray) to `create_primary_button` (blue)
+- ✅ DuplicateImageIdentifierGUI already correct
+
+**Clean Button:**
+- All use `ModernButton.create_danger_button()` (red danger color)
+- Changed ImageClassifierGUI from direct `tk.Button` to `ModernButton.create_danger_button()`
+- ✅ DuplicateImageIdentifierGUI already correct
+- ✅ BlurryImageDetectionGUI already correct
 
 ### 3. Layout Structure - Verified Consistent ✅
 
@@ -142,13 +152,20 @@ When comparing the three GUIs side by side, verify:
 ## Summary
 
 **Files Modified:** 3
-- `ImageClassifierGUI.py` - Title, subtitle, and button styling updated
-- `BlurryImageDetectionGUI.py` - Window title updated
+- `ImageClassifierGUI.py` - Title, subtitle, Select Folder button, Select All button, and Clean button updated
+- `BlurryImageDetectionGUI.py` - Window title and Select All button updated
 - `DuplicateImageIdentifierGUI.py` - No changes needed (already consistent)
+
+**Button Color Standardization:**
+- **Select Folder**: Blue (`ModernButton.create_primary_button()`)
+- **Select All**: Blue (`ModernButton.create_primary_button()`)
+- **Clean**: Red (`ModernButton.create_danger_button()`)
 
 **Result:** All three GUIs now have consistent:
 ✅ Window titles (all prefixed with "PhotoSift")
-✅ Button styling (all use ModernButton)
+✅ Button styling (all use ModernButton with consistent colors)
+✅ Select All buttons (all blue/primary color)
+✅ Clean buttons (all red/danger color)
 ✅ Layout structure
 ✅ Color scheme
 ✅ Spacing and padding
