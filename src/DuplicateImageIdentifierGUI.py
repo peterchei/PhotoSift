@@ -7,7 +7,7 @@ import time
 from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
                      StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager)
-from CommonUI import get_trash_icon_tk
+
 
 class DuplicateImageIdentifierApp:
     def __init__(self, root):
