@@ -1,3 +1,12 @@
+# Trash icon utility
+from PIL import Image, ImageTk
+def get_trash_icon_tk(size=48):
+    """Return a PhotoImage of the trash icon, resized to the given size, loaded from resources/Trash.png."""
+    import os
+    icon_path = os.path.join(os.path.dirname(__file__), '..', 'resources', 'Remove.png')
+    icon_img = Image.open(icon_path).convert('RGBA')
+    icon_img = icon_img.resize((size, size), Image.LANCZOS)
+    return ImageTk.PhotoImage(icon_img)
 """
 Common UI components shared across PhotoSift applications.
 

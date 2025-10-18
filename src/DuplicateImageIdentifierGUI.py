@@ -7,6 +7,7 @@ import time
 from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
                      StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager)
+from CommonUI import get_trash_icon_tk
 
 class DuplicateImageIdentifierApp:
     def __init__(self, root):
@@ -1849,35 +1850,33 @@ class DuplicateImageIdentifierApp:
         if not canvas:
             return
             
-        # Remove existing cross if any
+        # Remove existing overlay if any
         canvas.delete("cross_overlay")
-        
-        # If checkbox is checked, draw cross overlay
+        if not hasattr(self, '_trash_icon_cache'):
+            self._trash_icon_cache = {}
+        # If checkbox is checked, draw trash icon overlay
         if var.get():
-            # Try to get actual canvas dimensions
             width = canvas.winfo_width()
             height = canvas.winfo_height()
-            
-            # Fallback to configured size if not yet mapped
             if width <= 1 or height <= 1:
                 width = canvas.winfo_reqwidth()
                 height = canvas.winfo_reqheight()
-                
-            # Final fallback to image size from canvas config
             if width <= 1 or height <= 1:
-                width = canvas['width'] if 'width' in canvas.keys() else 100
-                height = canvas['height'] if 'height' in canvas.keys() else 100
-            
-            # Draw red cross lines
-            line_width = max(2, min(width, height) // 30)
-            
-            # Diagonal cross from top-left to bottom-right
-            canvas.create_line(0, 0, width, height, 
-                             fill="#ff0000", width=line_width, tags="cross_overlay")
-            
-            # Diagonal cross from top-right to bottom-left  
-            canvas.create_line(width, 0, 0, height,
-                             fill="#ff0000", width=line_width, tags="cross_overlay")
+                width = int(canvas['width']) if 'width' in canvas.keys() else 100
+                height = int(canvas['height']) if 'height' in canvas.keys() else 100
+            # Choose icon size (about 40% of min dimension)
+            icon_size = max(24, min(width, height) // 2)
+            if icon_size not in self._trash_icon_cache:
+                self._trash_icon_cache[icon_size] = get_trash_icon_tk(icon_size)
+            icon = self._trash_icon_cache[icon_size]
+            # Center the icon
+            x = width // 2
+            y = height // 2
+            canvas.create_image(x, y, image=icon, tags="cross_overlay")
+            # Keep a reference to prevent garbage collection
+            if not hasattr(canvas, '_icon_refs'):
+                canvas._icon_refs = []
+            canvas._icon_refs.append(icon)
 
 if __name__ == "__main__":
     root = tk.Tk()
