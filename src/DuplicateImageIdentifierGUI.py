@@ -6,7 +6,7 @@ import os
 import time
 from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
-                     StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager)
+                     StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager, FileOperations)
 
 
 class DuplicateImageIdentifierApp:
@@ -1374,50 +1374,20 @@ class DuplicateImageIdentifierApp:
     
     def move_images_to_trash(self, image_paths):
         """Move images to system trash or create local trash folder"""
-        # Create Trash directory if it doesn't exist
-        if not self.folder:
-            messagebox.showerror("Error", "No folder selected.")
-            return
-
-        trash_dir = os.path.join(self.folder, "Trash")
-        try:
-            os.makedirs(trash_dir, exist_ok=True)
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to create Trash directory:\n{str(e)}")
-            return
-
-        # Move files to trash
-        moved_count = 0
-        failed_files = []
+        # Move files to trash using shared functionality
+        moved_count, failed_files = FileOperations.move_images_to_trash(image_paths, self.folder)
         
+        # Remove from data structures
         for img_path in image_paths:
-            try:
-                # Generate unique filename in case of duplicates
-                base_name = os.path.basename(img_path)
-                name, ext = os.path.splitext(base_name)
-                target_path = os.path.join(trash_dir, base_name)
-                counter = 1
-                
-                while os.path.exists(target_path):
-                    target_path = os.path.join(trash_dir, f"{name}_{counter}{ext}")
-                    counter += 1
-                
-                # Move the file
-                import shutil
-                shutil.move(img_path, target_path)
-                moved_count += 1
-                
-                # Remove from data structures
-                self.remove_from_groups(img_path)
-                    
-            except Exception as e:
-                print(f"Failed to move {img_path}: {str(e)}")
-                failed_files.append(base_name)
-
+            self.remove_from_groups(img_path)
+        
         # Store results for refresh_after_clean
         self._last_clean_count = moved_count
         self._last_failed_files = failed_files
-        self._trash_dir = trash_dir
+        self._trash_dir = os.path.join(self.folder, "Trash")
+        
+        # Show completion popup using shared functionality
+        FileOperations.show_clean_completion_popup(self.root, moved_count, failed_files)
 
     def remove_from_groups(self, img_path):
         """Remove an image path from all groups"""
@@ -1766,46 +1736,7 @@ class DuplicateImageIdentifierApp:
                 
                 self.root.after(2000, re_enable_selection)  # Re-enable after 2 seconds
 
-    def show_clean_completion_popup(self):
-        """Show simple, fast completion message without blocking"""
-        import time
-        step_start = time.perf_counter()
-        print(f"[DEBUG] show_clean_completion_popup: Starting SIMPLIFIED popup creation")
-        
-        try:
-            # Get clean results
-            moved_count = getattr(self, '_last_clean_count', 0)
-            failed_files = getattr(self, '_last_failed_files', [])
-            
-            # Create simple message
-            if failed_files and len(failed_files) > 0:
-                title = "Partial Success"
-                message = f"Moved {moved_count} images to Trash\nFailed to move {len(failed_files)} files"
-            else:
-                title = "Clean Complete"
-                message = f"Successfully moved {moved_count} images to Trash"
-            
-            print(f"[DEBUG] show_clean_completion_popup: Using simple messagebox instead of complex popup")
-            
-            # Use simple, reliable messagebox instead of complex custom popup
-            # This runs asynchronously and won't block
-            def show_async_message():
-                try:
-                    messagebox.showinfo(title, message)
-                    print(f"[DEBUG] show_clean_completion_popup: Simple messagebox completed")
-                except Exception as e:
-                    print(f"[DEBUG] show_clean_completion_popup: Messagebox error: {e}")
-            
-            # Schedule the messagebox to appear after a short delay (non-blocking)
-            self.root.after(100, show_async_message)
-            
-            print(f"[DEBUG] show_clean_completion_popup: Simple popup scheduled - {time.perf_counter() - step_start:.3f}s")
-            
-        except Exception as e:
-            print(f"[DEBUG] show_clean_completion_popup: ERROR - {str(e)}")
-            print(f"Error showing popup: {str(e)}")
-        
-        print(f"[DEBUG] show_clean_completion_popup: Method complete - {time.perf_counter() - step_start:.3f}s")
+
 
     def restore_checkbox_states(self, checkbox_states):
         """Restore checkbox states and cross overlays after refresh"""

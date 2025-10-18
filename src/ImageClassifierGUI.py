@@ -13,7 +13,7 @@ from PIL import Image, ImageTk
 from ImageClassification import classify_people_vs_screenshot, IMG_EXT
 from ImageClassification import classify_people_vs_screenshot_batch
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
-                     StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager)
+                     StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager, FileOperations)
 
 class ImageClassifierApp:
     def select_all_photos(self):
@@ -1242,39 +1242,12 @@ class ImageClassifierApp:
         self._cleaning_in_progress = True
 
 
-        # Create Trash directory if it doesn't exist
-        if not self.folder:
-            messagebox.showerror("Error", "No folder selected.")
-            return
-
-        trash_dir = os.path.join(self.folder, "Trash")
         try:
-            os.makedirs(trash_dir, exist_ok=True)
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to create Trash directory:\n{str(e)}")
-            return
-
-        # Move files to trash
-        moved_count = 0
-        failed_files = []
-        
-        for img_path in selected:
-            try:
-                # Generate unique filename in case of duplicates
-                base_name = os.path.basename(img_path)
-                name, ext = os.path.splitext(base_name)
-                target_path = os.path.join(trash_dir, base_name)
-                counter = 1
-                
-                while os.path.exists(target_path):
-                    target_path = os.path.join(trash_dir, f"{name}_{counter}{ext}")
-                    counter += 1
-                
-                # Move the file
-                shutil.move(img_path, target_path)
-                moved_count += 1
-                
-                # Remove from data structures
+            # Move files to trash using shared functionality
+            moved_count, failed_files = FileOperations.move_images_to_trash(selected, self.folder)
+            
+            # Remove from data structures
+            for img_path in selected:
                 if img_path in self.images:
                     self.images.remove(img_path)
                 if img_path in self.people_images:
@@ -1287,110 +1260,18 @@ class ImageClassifierApp:
                     del self.confidence_scores[img_path]
                 if img_path in self.image_cache:
                     del self.image_cache[img_path]
-                    
-            except Exception as e:
-                print(f"Failed to move {img_path}: {str(e)}")
-                failed_files.append(base_name)
-
-        # Show professional popup message
-        try:
-            popup = tk.Toplevel()
-            popup.title("Operation Status")
             
-            # Make the window float on top
-            popup.lift()
-            popup.attributes('-topmost', True)
+            # Show completion popup using shared functionality
+            FileOperations.show_clean_completion_popup(self.root, moved_count, failed_files)
             
-            # Enhanced window setup
-            window_width = 380
-            window_height = 150
-            
-            # Get the position of the main window
-            main_window_x = self.root.winfo_x()
-            main_window_y = self.root.winfo_y()
-            main_window_width = self.root.winfo_width()
-            main_window_height = self.root.winfo_height()
-            
-            # Calculate position (centered on main window)
-            position_x = main_window_x + (main_window_width - window_width) // 2
-            position_y = main_window_y + (main_window_height - window_height) // 2
-            
-            # Set window geometry
-            popup.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
-            
-            # Configure window style
-            popup.configure(bg='#ffffff')
-            popup.overrideredirect(True)  # Remove window decorations
-            
-            # Create main container with border
-            border_frame = tk.Frame(popup, bg='#e2e8f0', padx=1, pady=1)
-            border_frame.pack(fill=tk.BOTH, expand=True)
-            
-            main_frame = tk.Frame(border_frame, bg='#ffffff')
-            main_frame.pack(fill=tk.BOTH, expand=True)
-            
-            # Header bar
-            header_frame = tk.Frame(main_frame, bg='#f8fafc', height=32)
-            header_frame.pack(fill=tk.X)
-            header_frame.pack_propagate(False)
-            
-            header_label = tk.Label(header_frame, text="Operation Complete",
-                                  bg='#f8fafc', fg='#334155',
-                                  font=("Segoe UI", 11, "bold"))
-            header_label.pack(side=tk.LEFT, padx=15, pady=6)
-            
-            # Content frame with padding
-            content_frame = tk.Frame(main_frame, bg='#ffffff', padx=20, pady=15)
-            content_frame.pack(fill=tk.BOTH, expand=True)
-            
-            # Status icon and colors
-            if failed_files:
-                icon = "⚠"
-                title = "Partial Success"
-                icon_color = "#dc2626"  # Red
-                message = f"Moved {moved_count} photos to Trash\n"
-                if len(failed_files) > 0:
-                    message += f"Failed to move {len(failed_files)} files"
-            else:
-                icon = "✓"
-                title = "Success"
-                icon_color = "#0369a1"  # Blue
-                message = f"Successfully moved {moved_count} photos to Trash"
-            
-            # Icon
-            icon_label = tk.Label(content_frame, text=icon, bg='#ffffff',
-                                fg=icon_color, font=("Segoe UI", 24))
-            icon_label.pack(pady=(0, 5))
-            
-            # Title
-            title_label = tk.Label(content_frame, text=title, bg='#ffffff',
-                                 fg=icon_color, font=("Segoe UI", 12, "bold"))
-            title_label.pack(pady=(0, 8))
-            
-            # Message
-            msg_label = tk.Label(content_frame, text=message, bg='#ffffff',
-                               fg='#475569', font=("Segoe UI", 11))
-            msg_label.pack()
-            
-            # Force the window to update and show
-            popup.update()
-            
-            # Add subtle fade out before destruction
-            def fade_out():
-                for i in range(10):
-                    opacity = 1.0 - (i / 10)
-                    popup.attributes('-alpha', opacity)
-                    popup.update()
-                    popup.after(50)
-                popup.destroy()
-            
-            # Schedule fade out and destruction
-            popup.after(1500, fade_out)
+            # Refresh UI
+            self.refresh_after_clean(selected)
             
         except Exception as e:
-            print(f"Error showing popup: {str(e)}")
-            messagebox.showinfo("Clean Complete", 
-                              f"Moved {moved_count} photos to Trash")
+            messagebox.showerror("Error", f"Failed to clean selected photos: {str(e)}")
+        finally:
+            # Reset cleaning flag
+            self._cleaning_in_progress = False
         
         # Refresh UI efficiently - only update what's needed
         try:

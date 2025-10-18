@@ -10,6 +10,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.messagebox
 import os
+import shutil
 from PIL import Image, ImageTk
 
 
@@ -813,3 +814,172 @@ class TrashManager:
                 tk.messagebox.showinfo("Trash Empty", f"No Trash folder found at:\n{trash_dir}\n\nNo items have been cleaned yet.")
             else:
                 tk.messagebox.showinfo("Trash Folder", "Trash folder does not exist yet.")
+
+
+class FileOperations:
+    """
+    Shared file operations for moving images to trash and showing completion popups.
+    
+    This class provides reusable methods for common file operations used across
+    PhotoSift GUI applications, reducing code duplication and ensuring consistent
+    behavior.
+    """
+    
+    @staticmethod
+    def move_images_to_trash(selected_paths, folder_path):
+        """
+        Move selected image files to the trash directory.
+        
+        Args:
+            selected_paths: List of image file paths to move
+            folder_path: Base folder path where Trash directory should be created
+            
+        Returns:
+            tuple: (moved_count, failed_files) where failed_files contains base filenames
+        """
+        if not folder_path:
+            raise ValueError("No folder path provided")
+            
+        # Create Trash directory if it doesn't exist
+        trash_dir = os.path.join(folder_path, "Trash")
+        try:
+            os.makedirs(trash_dir, exist_ok=True)
+        except Exception as e:
+            raise Exception(f"Failed to create Trash directory: {str(e)}")
+        
+        # Move files to trash
+        moved_count = 0
+        failed_files = []
+        
+        for img_path in selected_paths:
+            try:
+                # Generate unique filename in case of duplicates
+                base_name = os.path.basename(img_path)
+                name, ext = os.path.splitext(base_name)
+                target_path = os.path.join(trash_dir, base_name)
+                counter = 1
+                
+                while os.path.exists(target_path):
+                    target_path = os.path.join(trash_dir, f"{name}_{counter}{ext}")
+                    counter += 1
+                
+                # Move the file
+                import shutil
+                shutil.move(img_path, target_path)
+                moved_count += 1
+                
+            except Exception as e:
+                print(f"Failed to move {img_path}: {str(e)}")
+                failed_files.append(os.path.basename(img_path))
+        
+        return moved_count, failed_files
+    
+    @staticmethod
+    def show_clean_completion_popup(root, moved_count, failed_files):
+        """
+        Show a professional popup message indicating the completion of a clean operation.
+        
+        Args:
+            root: The root tkinter window for positioning the popup
+            moved_count: Number of files successfully moved
+            failed_files: List of filenames that failed to move
+        """
+        try:
+            popup = tk.Toplevel()
+            popup.title("Operation Status")
+            
+            # Make the window float on top
+            popup.lift()
+            popup.attributes('-topmost', True)
+            
+            # Enhanced window setup
+            window_width = 380
+            window_height = 150
+            
+            # Get the position of the main window
+            main_window_x = root.winfo_x()
+            main_window_y = root.winfo_y()
+            main_window_width = root.winfo_width()
+            main_window_height = root.winfo_height()
+            
+            # Calculate position (centered on main window)
+            position_x = main_window_x + (main_window_width - window_width) // 2
+            position_y = main_window_y + (main_window_height - window_height) // 2
+            
+            # Set window geometry
+            popup.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
+            
+            # Configure window style
+            popup.configure(bg='#ffffff')
+            popup.overrideredirect(True)  # Remove window decorations
+            
+            # Create main container with border
+            border_frame = tk.Frame(popup, bg='#e2e8f0', padx=1, pady=1)
+            border_frame.pack(fill=tk.BOTH, expand=True)
+            
+            main_frame = tk.Frame(border_frame, bg='#ffffff')
+            main_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Header bar
+            header_frame = tk.Frame(main_frame, bg='#f8fafc', height=32)
+            header_frame.pack(fill=tk.X)
+            header_frame.pack_propagate(False)
+            
+            header_label = tk.Label(header_frame, text="Operation Complete",
+                                  bg='#f8fafc', fg='#334155',
+                                  font=("Segoe UI", 11, "bold"))
+            header_label.pack(side=tk.LEFT, padx=15, pady=6)
+            
+            # Content frame with padding
+            content_frame = tk.Frame(main_frame, bg='#ffffff', padx=20, pady=15)
+            content_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Status icon and colors
+            if failed_files:
+                icon = "⚠"
+                title = "Partial Success"
+                icon_color = "#dc2626"  # Red
+                message = f"Moved {moved_count} photos to Trash\n"
+                if len(failed_files) > 0:
+                    message += f"Failed to move {len(failed_files)} files"
+            else:
+                icon = "✓"
+                title = "Success"
+                icon_color = "#0369a1"  # Blue
+                message = f"Successfully moved {moved_count} photos to Trash"
+            
+            # Icon
+            icon_label = tk.Label(content_frame, text=icon, bg='#ffffff',
+                                fg=icon_color, font=("Segoe UI", 24))
+            icon_label.pack(pady=(0, 5))
+            
+            # Title
+            title_label = tk.Label(content_frame, text=title, bg='#ffffff',
+                                 fg=icon_color, font=("Segoe UI", 12, "bold"))
+            title_label.pack(pady=(0, 8))
+            
+            # Message
+            msg_label = tk.Label(content_frame, text=message, bg='#ffffff',
+                               fg='#475569', font=("Segoe UI", 11))
+            msg_label.pack()
+            
+            # Force the window to update and show
+            popup.update()
+            
+            # Add subtle fade out before destruction
+            def fade_out():
+                for i in range(10):
+                    opacity = 1.0 - (i / 10)
+                    popup.attributes('-alpha', opacity)
+                    popup.update()
+                    import time
+                    time.sleep(0.05)
+                popup.destroy()
+            
+            # Schedule fade out and destruction
+            popup.after(1500, fade_out)
+            
+        except Exception as e:
+            print(f"Error showing popup: {str(e)}")
+            tk.messagebox.showinfo("Clean Complete", 
+                                 f"Moved {moved_count} photos to Trash")
