@@ -36,6 +36,7 @@ class BlurryImageDetectionApp:
         self.image_cache = {}
         self.blur_scores = {}  # Cache blur scores to avoid recalculation
         self.selected_check_vars = []
+        self._trash_icon_cache = {}  # Cache for trash icon sizes
         self._cleaning_in_progress = False
         self.detector = BlurryImageDetector()
         
@@ -517,10 +518,23 @@ class BlurryImageDetectionApp:
             img_tk = self.get_thumbnail(path)
             self.thumb_imgs.append(img_tk)
 
-            lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
-            lbl_img.image = img_tk
-            lbl_img.pack()
-            lbl_img.bind('<Double-Button-1>', lambda e, p=path: self.open_full_image(p))
+            # Canvas for image with overlay support
+            img_canvas = tk.Canvas(img_container, 
+                                 width=img_tk.width(), 
+                                 height=img_tk.height(),
+                                 bg=self.colors['bg_card'], 
+                                 highlightthickness=0, bd=0)
+            img_canvas.pack()
+            
+            # Draw image on canvas
+            img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
+            img_canvas.image = img_tk  # Keep reference
+            
+            # Store canvas reference for overlay updates
+            setattr(img_canvas, 'img_path', path)
+            
+            # Add double-click to open full image
+            img_canvas.bind('<Double-Button-1>', lambda e, p=path: self.open_full_image(p))
 
             # Modern hover effects
             def on_enter(ev, c=card):
@@ -530,8 +544,8 @@ class BlurryImageDetectionApp:
             
             card.bind("<Enter>", on_enter)
             card.bind("<Leave>", on_leave)
-            lbl_img.bind("<Enter>", on_enter)
-            lbl_img.bind("<Leave>", on_leave)
+            img_canvas.bind("<Enter>", on_enter)
+            img_canvas.bind("<Leave>", on_leave)
 
             # Info section at bottom
             info_frame = tk.Frame(card, bg=self.colors['bg_card'])
@@ -554,8 +568,8 @@ class BlurryImageDetectionApp:
                                anchor="w")
             chk.pack(fill=tk.X, pady=(0, 4))
             
-            var.trace_add('write', lambda *args: self.update_clean_btn_label())
-            self.selected_check_vars.append((var, path))
+            var.trace_add('write', lambda *args, v=var, p=path, c=img_canvas: self.on_image_check(v, p, c))
+            self.selected_check_vars.append((var, path, img_canvas))
 
             # Get blur score from cache (already calculated during scan)
             score = self.blur_scores.get(path, 0)
@@ -584,7 +598,6 @@ class BlurryImageDetectionApp:
             ToolTip(score_label, tooltip_text)
 
         self.update_page_controls()
-        self.update_clean_btn_label()
         self.update_zoom_controls()
         self.root.config(cursor="")
         self.thumb_canvas.yview_moveto(0)
@@ -661,8 +674,9 @@ class BlurryImageDetectionApp:
         current_state = self.selected_check_vars[0][0].get()
         new_state = not current_state
         
-        for var, _ in self.selected_check_vars:
+        for var, path, canvas in self.selected_check_vars:
             var.set(new_state)
+            ImageUtils.update_cross_overlay(self.selected_check_vars, var, path, self._trash_icon_cache)
         
         self.update_select_all_button_text()
 
@@ -671,13 +685,15 @@ class BlurryImageDetectionApp:
             self.select_all_btn_var.set("Select All")
             return
         
-        all_selected = all(var.get() for var, _ in self.selected_check_vars)
+        all_selected = all(var.get() for var, _, _ in self.selected_check_vars)
         self.select_all_btn_var.set("Unselect All" if all_selected else "Select All")
 
     def count_selected_photos(self):
-        return sum(1 for var, _ in self.selected_check_vars if var.get())
+        return sum(1 for var, _, _ in self.selected_check_vars if var.get())
 
-    def update_clean_btn_label(self):
+    def on_image_check(self, var, path, canvas):
+        """Handle checkbox state changes and update trash overlay"""
+        ImageUtils.update_cross_overlay(self.selected_check_vars, var, path, self._trash_icon_cache)
         count = self.count_selected_photos()
         self.clean_btn_var.set(f"Clean ({count})")
         self.update_select_all_button_text()
@@ -687,7 +703,7 @@ class BlurryImageDetectionApp:
         if self._cleaning_in_progress:
             return
         
-        selected_paths = [path for var, path in self.selected_check_vars if var.get()]
+        selected_paths = [path for var, path, _ in self.selected_check_vars if var.get()]
         if not selected_paths:
             messagebox.showinfo("Clean", "No photos selected.")
             return

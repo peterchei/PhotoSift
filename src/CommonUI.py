@@ -394,9 +394,12 @@ class ImageUtils:
     
     @staticmethod
     def get_trash_icon_tk(size=48):
-        """Return a PhotoImage of the trash icon, resized to the given size, loaded from resources/Trash.png."""
+        """Return a PhotoImage of the trash icon, resized to the given size, loaded from resources/Remove.png."""
         import os
-        icon_path = os.path.join(os.path.dirname(__file__), '..', 'resources', 'Remove.png')
+        # Get the directory of this module file
+        module_dir = os.path.dirname(os.path.abspath(__file__))
+        icon_path = os.path.join(module_dir, '..', 'resources', 'Remove.png')
+        icon_path = os.path.abspath(icon_path)
         icon_img = Image.open(icon_path).convert('RGBA')
         icon_img = icon_img.resize((size, size), Image.LANCZOS)
         return ImageTk.PhotoImage(icon_img)
