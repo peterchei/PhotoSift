@@ -722,6 +722,9 @@ class BlurryImageDetectionApp:
             # Show completion popup using shared functionality
             FileOperations.show_clean_completion_popup(self.root, moved_count, failed_files)
             
+            # Update trash count
+            self.trash_manager.update_trash_count()
+            
             # Refresh UI - remove moved photos from the lists
             self.on_scan_complete({
                 'blurry_images': [(p, s) for p, s in self.blurry_images if p not in selected_paths],
