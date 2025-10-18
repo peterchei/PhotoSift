@@ -7,6 +7,60 @@ def get_trash_icon_tk(size=48):
     icon_img = Image.open(icon_path).convert('RGBA')
     icon_img = icon_img.resize((size, size), Image.LANCZOS)
     return ImageTk.PhotoImage(icon_img)
+
+def update_cross_overlay(selected_check_vars, var, img_path, trash_icon_cache=None):
+    """
+    Add or remove trash icon overlay on image based on checkbox state.
+    
+    This is a reusable utility function for overlaying a trash icon on selected images
+    across different PhotoSift GUIs.
+    
+    Args:
+        selected_check_vars: List of tuples (var, img_path, canvas) for all checkboxes
+        var: The checkbox variable that triggered the update
+        img_path: Path to the image being updated
+        trash_icon_cache: Optional cache dict for icon sizes (will be created if None)
+    """
+    # Find the canvas for this image path
+    canvas = None
+    for item in selected_check_vars:
+        if len(item) >= 3 and item[1] == img_path:
+            canvas = item[2]
+            break
+    
+    if not canvas:
+        return
+        
+    # Remove existing overlay if any
+    canvas.delete("cross_overlay")
+    
+    # Initialize cache if not provided
+    if trash_icon_cache is None:
+        trash_icon_cache = {}
+    
+    # If checkbox is checked, draw trash icon overlay
+    if var.get():
+        width = canvas.winfo_width()
+        height = canvas.winfo_height()
+        if width <= 1 or height <= 1:
+            width = canvas.winfo_reqwidth()
+            height = canvas.winfo_reqheight()
+        if width <= 1 or height <= 1:
+            width = int(canvas['width']) if 'width' in canvas.keys() else 100
+            height = int(canvas['height']) if 'height' in canvas.keys() else 100
+        # Choose icon size (about 40% of min dimension)
+        icon_size = max(24, min(width, height) // 2)
+        if icon_size not in trash_icon_cache:
+            trash_icon_cache[icon_size] = get_trash_icon_tk(icon_size)
+        icon = trash_icon_cache[icon_size]
+        # Center the icon
+        x = width // 2
+        y = height // 2
+        canvas.create_image(x, y, image=icon, tags="cross_overlay")
+        # Keep a reference to prevent garbage collection
+        if not hasattr(canvas, '_icon_refs'):
+            canvas._icon_refs = []
+        canvas._icon_refs.append(icon)
 """
 Common UI components shared across PhotoSift applications.
 

@@ -6,7 +6,8 @@ import os
 import time
 from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
-                     StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager)
+                     StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager,
+                     update_cross_overlay)
 from CommonUI import get_trash_icon_tk
 
 class DuplicateImageIdentifierApp:
@@ -1480,7 +1481,7 @@ class DuplicateImageIdentifierApp:
             return
             
         # Update cross overlay on image
-        self.update_cross_overlay(var, img_path)
+        update_cross_overlay(self.selected_check_vars, var, img_path, getattr(self, '_trash_icon_cache', None))
             
         # Update clean button count based on selected images
         selected_count = sum(1 for item in self.selected_check_vars 
@@ -1541,7 +1542,7 @@ class DuplicateImageIdentifierApp:
         for item in self.selected_check_vars:
             if len(item) >= 2:
                 var, img_path = item[0], item[1]
-                self.update_cross_overlay(var, img_path)
+                update_cross_overlay(self.selected_check_vars, var, img_path, getattr(self, '_trash_icon_cache', None))
         
         # Update clean button once at the end
         selected_count = self.count_selected_images()
@@ -1827,7 +1828,7 @@ class DuplicateImageIdentifierApp:
             if len(item) >= 2:
                 var, img_path = item[0], item[1]
                 if img_path in checkbox_states and checkbox_states[img_path]:
-                    self.update_cross_overlay(var, img_path)
+                    update_cross_overlay(self.selected_check_vars, var, img_path, getattr(self, '_trash_icon_cache', None))
         
         # Update clean button count
         selected_count = self.count_selected_images()
@@ -1837,46 +1838,6 @@ class DuplicateImageIdentifierApp:
     def open_full_image(self, img_path):
         """Open image in full-size window using common utility"""
         ImageUtils.open_full_image(self.root, img_path)
-
-    def update_cross_overlay(self, var, img_path):
-        """Add or remove cross overlay on image based on checkbox state"""
-        # Find the canvas for this image path
-        canvas = None
-        for item in self.selected_check_vars:
-            if len(item) >= 3 and item[1] == img_path:
-                canvas = item[2]
-                break
-        
-        if not canvas:
-            return
-            
-        # Remove existing overlay if any
-        canvas.delete("cross_overlay")
-        if not hasattr(self, '_trash_icon_cache'):
-            self._trash_icon_cache = {}
-        # If checkbox is checked, draw trash icon overlay
-        if var.get():
-            width = canvas.winfo_width()
-            height = canvas.winfo_height()
-            if width <= 1 or height <= 1:
-                width = canvas.winfo_reqwidth()
-                height = canvas.winfo_reqheight()
-            if width <= 1 or height <= 1:
-                width = int(canvas['width']) if 'width' in canvas.keys() else 100
-                height = int(canvas['height']) if 'height' in canvas.keys() else 100
-            # Choose icon size (about 40% of min dimension)
-            icon_size = max(24, min(width, height) // 2)
-            if icon_size not in self._trash_icon_cache:
-                self._trash_icon_cache[icon_size] = get_trash_icon_tk(icon_size)
-            icon = self._trash_icon_cache[icon_size]
-            # Center the icon
-            x = width // 2
-            y = height // 2
-            canvas.create_image(x, y, image=icon, tags="cross_overlay")
-            # Keep a reference to prevent garbage collection
-            if not hasattr(canvas, '_icon_refs'):
-                canvas._icon_refs = []
-            canvas._icon_refs.append(icon)
 
 if __name__ == "__main__":
     root = tk.Tk()
