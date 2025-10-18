@@ -874,6 +874,9 @@ class ImageClassifierApp:
             if item['text'].startswith('Screenshot') and not item['values']:
                 # Screenshot node selected, show all screenshot images
                 selected_paths.extend(self.screenshot_images)
+            elif item['text'].startswith('People') and not item['values']:
+                # People node selected, show all people images
+                selected_paths.extend(self.people_images)
             elif 'values' in item and item['values']:
                 selected_paths.append(item['values'][0])
         if selected_paths:
