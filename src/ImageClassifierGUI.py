@@ -24,9 +24,10 @@ class ImageClassifierApp:
         first_var = self.selected_check_vars[0][0]
         new_state = not first_var.get()
         
-        # Update all checkboxes
-        for var, _ in self.selected_check_vars:
+        # Update all checkboxes and overlays
+        for var, path, canvas in self.selected_check_vars:
             var.set(new_state)
+            ImageUtils.update_cross_overlay(self.selected_check_vars, var, path, self._trash_icon_cache)
             
         # Update clean button label
         self.update_clean_btn_label(self.count_selected_photos())
@@ -94,11 +95,23 @@ class ImageClassifierApp:
                 img_container = tk.Frame(card, bg=self.colors['bg_card'])
                 img_container.pack(fill=tk.BOTH, expand=True, padx=12, pady=(12, 8))
                 
-                # Modern image label
-                lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
-                lbl_img.image = img_tk
-                lbl_img.pack()
-                lbl_img.bind('<Double-Button-1>', lambda e, p=img_path: self.open_full_image(p))
+                # Canvas for image with overlay support
+                img_canvas = tk.Canvas(img_container, 
+                                     width=img_tk.width(), 
+                                     height=img_tk.height(),
+                                     bg=self.colors['bg_card'], 
+                                     highlightthickness=0, bd=0)
+                img_canvas.pack()
+                
+                # Draw image on canvas
+                img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
+                img_canvas.image = img_tk  # Keep reference
+                
+                # Store canvas reference for overlay updates
+                setattr(img_canvas, 'img_path', img_path)
+                
+                # Add double-click to open full image
+                img_canvas.bind('<Double-Button-1>', lambda e, p=img_path: self.open_full_image(p))
                 
                 # Modern hover effects
                 def on_enter(ev, c=card):
@@ -108,8 +121,8 @@ class ImageClassifierApp:
                 
                 card.bind("<Enter>", on_enter)
                 card.bind("<Leave>", on_leave)
-                lbl_img.bind("<Enter>", on_enter)
-                lbl_img.bind("<Leave>", on_leave)
+                img_canvas.bind("<Enter>", on_enter)
+                img_canvas.bind("<Leave>", on_leave)
                 
                 # Info section at bottom
                 info_frame = tk.Frame(card, bg=self.colors['bg_card'])
@@ -157,8 +170,8 @@ class ImageClassifierApp:
                                         anchor="w")
                     conf_label.pack(fill=tk.X)
                 
-                self.selected_check_vars.append((var, img_path))
-                var.trace_add('write', lambda *args: self.update_clean_btn_label(self.count_selected_photos()))
+                self.selected_check_vars.append((var, img_path, img_canvas))
+                var.trace_add('write', lambda *args, v=var, p=img_path, c=img_canvas: self.on_image_check(v, p, c))
             except Exception as e:
                 print(f"Error loading thumbnail: {e}")
                 continue
@@ -196,6 +209,9 @@ class ImageClassifierApp:
         
         # Cleaning operation flag
         self._cleaning_in_progress = False
+        
+        # Trash icon cache for overlay functionality
+        self._trash_icon_cache = {}
         
         # Use centralized color scheme
         self.colors = ModernColors.get_color_scheme()
@@ -1066,10 +1082,23 @@ class ImageClassifierApp:
                 img_container = tk.Frame(frame, bg=self.colors['bg_card'])
                 img_container.pack(fill=tk.BOTH, expand=True, padx=4, pady=(4, 2))
                 
-                lbl_img = tk.Label(img_container, image=img_tk, bg=self.colors['bg_card'], bd=0)
-                lbl_img.image = img_tk
-                lbl_img.pack()
-                lbl_img.bind('<Double-Button-1>', lambda e, p=img_path: self.open_full_image(p))
+                # Canvas for image with overlay support
+                img_canvas = tk.Canvas(img_container, 
+                                     width=img_tk.width(), 
+                                     height=img_tk.height(),
+                                     bg=self.colors['bg_card'], 
+                                     highlightthickness=0, bd=0)
+                img_canvas.pack()
+                
+                # Draw image on canvas
+                img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
+                img_canvas.image = img_tk  # Keep reference
+                
+                # Store canvas reference for overlay updates
+                setattr(img_canvas, 'img_path', img_path)
+                
+                # Add double-click to open full image
+                img_canvas.bind('<Double-Button-1>', lambda e, p=img_path: self.open_full_image(p))
                 
                 # Modern hover animations
                 def on_enter(ev, f=frame):
@@ -1079,8 +1108,8 @@ class ImageClassifierApp:
                     f.config(highlightbackground=self.colors['bg_secondary'], highlightthickness=1)
                 frame.bind("<Enter>", on_enter)
                 frame.bind("<Leave>", on_leave)
-                lbl_img.bind("<Enter>", on_enter)
-                lbl_img.bind("<Leave>", on_leave)
+                img_canvas.bind("<Enter>", on_enter)
+                img_canvas.bind("<Leave>", on_leave)
                 
                 var = tk.BooleanVar()
                 # Create frame for text (filename and confidence)
@@ -1095,7 +1124,7 @@ class ImageClassifierApp:
                 chk = tk.Checkbutton(text_frame, 
                                    text=filename, 
                                    variable=var, 
-                                   command=lambda v=var, p=img_path: self.on_image_check(v, p), 
+                                   command=lambda v=var, p=img_path, c=img_canvas: self.on_image_check(v, p, c), 
                                    font=("Segoe UI", 9, "bold"), 
                                    bg=self.colors['bg_card'],
                                    fg=self.colors['text_primary'],
@@ -1131,8 +1160,8 @@ class ImageClassifierApp:
                     category = self.image_labels.get(img_path, "unknown")
                     tooltip_text = self.get_confidence_tooltip(conf_score, category)
                     ToolTip(conf_label, tooltip_text)
-                self.selected_check_vars.append((var, img_path))
-                var.trace_add('write', lambda *args: self.update_clean_btn_label(self.count_selected_photos()))
+                self.selected_check_vars.append((var, img_path, img_canvas))
+                var.trace_add('write', lambda *args, v=var, p=img_path, c=img_canvas: self.on_image_check(v, p, c))
             except Exception:
                 continue
         self.thumb_canvas.update_idletasks()
@@ -1179,7 +1208,7 @@ class ImageClassifierApp:
         return tooltip
     
     def count_selected_photos(self):
-        return sum(var.get() for var, _ in self.selected_check_vars)
+        return sum(var.get() for var, _, _ in self.selected_check_vars)
 
     def update_select_all_button_text(self):
         """Update Select All button text based on current selection state"""
@@ -1188,7 +1217,7 @@ class ImageClassifierApp:
             return
         
         # Check if all photos are selected
-        all_selected = all(var.get() for var, _ in self.selected_check_vars)
+        all_selected = all(var.get() for var, _, _ in self.selected_check_vars)
         self.select_all_btn_var.set("Unselect All" if all_selected else "Select All")
 
     def update_clean_btn_label(self, count):
@@ -1204,7 +1233,7 @@ class ImageClassifierApp:
             return
             
         # Get selected photos
-        selected = [img_path for var, img_path in self.selected_check_vars if var.get()]
+        selected = [img_path for var, img_path, _ in self.selected_check_vars if var.get()]
         if not selected:
             messagebox.showinfo("Clean", "No photos selected.")
             return
@@ -1443,7 +1472,7 @@ class ImageClassifierApp:
         """Remove specific thumbnails without rebuilding entire view"""
         try:
             # Remove cleaned images from selected_check_vars
-            self.selected_check_vars = [(var, path) for var, path in self.selected_check_vars 
+            self.selected_check_vars = [(var, path, canvas) for var, path, canvas in self.selected_check_vars 
                                       if path not in cleaned_paths]
             
             # Since thumbnails don't have img_path attributes, just refresh the current view
@@ -1460,21 +1489,12 @@ class ImageClassifierApp:
         """Open image in full-size window using common utility"""
         ImageUtils.open_full_image(self.root, img_path)
 
-    def on_image_check(self, var, path, frame=None):
-        if frame:
-            if var.get():
-                # Selected state - blue accent highlight
-                frame.config(bg=self.colors['bg_card'], 
-                           highlightbackground=self.colors['accent'], 
-                           highlightthickness=3)
-            else:
-                # Unselected state - default dark theme colors
-                frame.config(bg=self.colors['bg_card'], 
-                           highlightbackground=self.colors['bg_secondary'], 
-                           highlightthickness=1)
-        
-        print(f"Selected: {os.path.basename(path)}")
-        #messagebox.showinfo("Image Selected", f"Selected: {os.path.basename(path)}")
+    def on_image_check(self, var, path, canvas):
+        """Handle checkbox state changes and update trash overlay"""
+        ImageUtils.update_cross_overlay(self.selected_check_vars, var, path, self._trash_icon_cache)
+        count = self.count_selected_photos()
+        self.clean_btn_var.set(f"Clean ({count})")
+        self.update_select_all_button_text()
 
     def show_img(self):
         img_list = self.get_current_list()
