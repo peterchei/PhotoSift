@@ -6,8 +6,7 @@ import os
 import time
 from DuplicateImageIdentifier import group_similar_images_clip, IMG_EXT
 from CommonUI import (ToolTip, ModernColors, ProgressWindow, ModernStyling, 
-                     StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager,
-                     update_cross_overlay)
+                     StatusBar, ZoomControls, ModernButton, ImageUtils, TrashManager)
 from CommonUI import get_trash_icon_tk
 
 class DuplicateImageIdentifierApp:
@@ -1481,7 +1480,7 @@ class DuplicateImageIdentifierApp:
             return
             
         # Update cross overlay on image
-        update_cross_overlay(self.selected_check_vars, var, img_path, getattr(self, '_trash_icon_cache', None))
+        ImageUtils.update_cross_overlay(self.selected_check_vars, var, img_path, getattr(self, '_trash_icon_cache', None))
             
         # Update clean button count based on selected images
         selected_count = sum(1 for item in self.selected_check_vars 
@@ -1542,7 +1541,7 @@ class DuplicateImageIdentifierApp:
         for item in self.selected_check_vars:
             if len(item) >= 2:
                 var, img_path = item[0], item[1]
-                update_cross_overlay(self.selected_check_vars, var, img_path, getattr(self, '_trash_icon_cache', None))
+                ImageUtils.update_cross_overlay(self.selected_check_vars, var, img_path, getattr(self, '_trash_icon_cache', None))
         
         # Update clean button once at the end
         selected_count = self.count_selected_images()
@@ -1828,7 +1827,7 @@ class DuplicateImageIdentifierApp:
             if len(item) >= 2:
                 var, img_path = item[0], item[1]
                 if img_path in checkbox_states and checkbox_states[img_path]:
-                    update_cross_overlay(self.selected_check_vars, var, img_path, getattr(self, '_trash_icon_cache', None))
+                    ImageUtils.update_cross_overlay(self.selected_check_vars, var, img_path, getattr(self, '_trash_icon_cache', None))
         
         # Update clean button count
         selected_count = self.count_selected_images()
