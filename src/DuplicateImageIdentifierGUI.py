@@ -938,7 +938,7 @@ class DuplicateImageIdentifierApp:
                 group_header.grid_propagate(False)
                 
                 header_label = tk.Label(group_header, 
-                                       text=f"📂 {group_name}", 
+                                       text=f"{group_name}", 
                                        font=("Segoe UI", 12, "bold"),
                                        bg=self.colors['bg_secondary'],
                                        fg=self.colors['text_primary'])
@@ -997,7 +997,7 @@ class DuplicateImageIdentifierApp:
     def display_images_in_row(self, group_images, row):
         """Display images in a single row layout (for multiple group selection)"""
         images_frame = tk.Frame(self.img_panel, bg=self.colors['bg_primary'])
-        images_frame.grid(row=row, column=0, columnspan=10, sticky='ew', padx=5, pady=(0, 10))
+        images_frame.grid(row=row, column=0, columnspan=10, sticky='ew', padx=1, pady=1)
         
         for col, (img_tk, img_path) in enumerate(group_images):
             self.create_image_card(img_tk, img_path, 0, col, parent=images_frame, is_grid=False)
@@ -1016,12 +1016,12 @@ class DuplicateImageIdentifierApp:
                        relief=tk.SOLID)
         
         if is_grid:
-            card.grid(row=row, column=col, padx=10, pady=10, sticky='nsew')
+            card.grid(row=row, column=col, padx=1, pady=1, sticky='nsew')
         else:
-            card.grid(row=row, column=col, padx=5, pady=5, sticky='nsew')
+            card.grid(row=row, column=col, padx=1, pady=1, sticky='nsew')
         
         # Image container
-        padding = 8 if is_grid else 5
+        padding = 1 if is_grid else 1
         img_container = tk.Frame(card, bg=self.colors['bg_card'])
         img_container.pack(fill=tk.BOTH, expand=True, padx=padding, pady=padding)
         

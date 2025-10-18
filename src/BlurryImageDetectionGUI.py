@@ -508,7 +508,7 @@ class BlurryImageDetectionApp:
                            highlightbackground=self.colors['bg_secondary'], 
                            highlightthickness=1,
                            relief=tk.SOLID)
-            card.grid(row=row, column=col, padx=15, pady=15, sticky="nsew")
+            card.grid(row=row, column=col, padx=1, pady=1, sticky="nsew")
 
             # Image container with padding
             img_container = tk.Frame(card, bg=self.colors['bg_card'])

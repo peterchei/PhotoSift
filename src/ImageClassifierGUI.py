@@ -85,7 +85,7 @@ class ImageClassifierApp:
                                highlightbackground=self.colors['bg_secondary'], 
                                highlightthickness=1,
                                relief=tk.SOLID)
-                card.grid(row=idx//4, column=idx%4, padx=15, pady=15, sticky="nsew")
+                card.grid(row=idx//4, column=idx%4, padx=1, pady=1, sticky="nsew")
                 
                 # Configure grid weights for responsive layout
                 self.thumbs_frame.grid_columnconfigure(idx%4, weight=1)
@@ -1057,7 +1057,7 @@ class ImageClassifierApp:
                                highlightbackground=self.colors['bg_secondary'], 
                                highlightthickness=1,
                                relief=tk.SOLID)
-                frame.grid(row=idx//cols, column=idx%cols, padx=6, pady=6, sticky='nsew')
+                frame.grid(row=idx//cols, column=idx%cols, padx=1, pady=1, sticky='nsew')
                 
                 # Image container with reduced padding
                 img_container = tk.Frame(frame, bg=self.colors['bg_card'])
