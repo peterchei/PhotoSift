@@ -1,5 +1,5 @@
 #define MyAppName "PhotoSift"
-#define MyAppVersion "1.3.1"
+#define MyAppVersion "1.4.0"
 #define MyAppPublisher "PhotoSift"
 #define MyAppURL "https://github.com/peterchei/PhotoSift"
 #define MyAppExeName "PhotoSift.exe"

@@ -5,7 +5,7 @@ Verify version numbers are consistent across all build files for PhotoSift
 import re
 
 print("=" * 70)
-print("PhotoSift Version Verification - Checking for 1.3.1")
+print("PhotoSift Version Verification - Checking for 1.4.0")
 print("=" * 70)
 
 files_to_check = {
@@ -16,8 +16,8 @@ files_to_check = {
     'create_store_assets.py': (r'PhotoSift v([\d.]+)', 'Store assets display version'),
 }
 
-expected_version = "1.3.1"
-expected_store_version = "1.3.1.0"
+expected_version = "1.4.0"
+expected_store_version = "1.4.0.0"
 all_correct = True
 
 for filename, (pattern, description) in files_to_check.items():
@@ -89,7 +89,7 @@ except Exception as e:
 
 print("\n" + "=" * 70)
 if all_correct:
-    print("✅ ALL VERSION NUMBERS ARE CORRECT (1.3.1)")
+    print("✓ ALL VERSION NUMBERS ARE CORRECT (1.4.0)")
     print("=" * 70)
     print("\nReady to build:")
     print("  1. Run: .\\build.bat")
