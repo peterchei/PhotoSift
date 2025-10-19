@@ -10,6 +10,7 @@ a = Analysis(
         ('src/*.py', '.'),  # Include all Python files
         ('models/clip-vit-base-patch32/*', 'models/clip-vit-base-patch32/'),  # Include CLIP model files
         ('models/*', 'models/'),  # Include any other model files
+        ('resources/*', 'resources/'),  # Include resource files (icons, images)
     ],
     hiddenimports=[
         # Image and graphics libraries
