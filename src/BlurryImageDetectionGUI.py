@@ -513,7 +513,7 @@ class BlurryImageDetectionApp:
 
             # Image container with padding
             img_container = tk.Frame(card, bg=self.colors['bg_card'])
-            img_container.pack(fill=tk.BOTH, expand=True, padx=12, pady=(12, 8))
+            img_container.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
 
             img_tk = self.get_thumbnail(path)
             self.thumb_imgs.append(img_tk)
@@ -549,7 +549,7 @@ class BlurryImageDetectionApp:
 
             # Info section at bottom
             info_frame = tk.Frame(card, bg=self.colors['bg_card'])
-            info_frame.pack(fill=tk.X, padx=12, pady=(0, 12))
+            info_frame.pack(fill=tk.X, padx=1, pady=1)
 
             var = tk.BooleanVar()
             filename = os.path.basename(path)
@@ -565,8 +565,8 @@ class BlurryImageDetectionApp:
                                activebackground=self.colors['bg_card'],
                                selectcolor=self.colors['accent'], 
                                bd=0, highlightthickness=0,
-                               anchor="w")
-            chk.pack(fill=tk.X, pady=(0, 4))
+                               anchor="w", padx=1, pady=1)
+            chk.pack(fill=tk.X, padx=1, pady=1)
             
             var.trace_add('write', lambda *args, v=var, p=path, c=img_canvas: self.on_image_check(v, p, c))
             self.selected_check_vars.append((var, path, img_canvas))
@@ -590,8 +590,8 @@ class BlurryImageDetectionApp:
                                    bg=self.colors['bg_card'], 
                                    fg=score_color,
                                    font=("Segoe UI", 9),
-                                   anchor="w")
-            score_label.pack(fill=tk.X)
+                                   anchor="w", padx=1, pady=1)
+            score_label.pack(fill=tk.X, padx=1, pady= 1)
             
             # Add tooltip with blur score explanation
             tooltip_text = self.get_blur_score_tooltip(score, quality)

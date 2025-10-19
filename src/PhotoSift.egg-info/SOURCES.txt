@@ -10,6 +10,9 @@ src/PhotoSift.egg-info/top_level.txt
 tests/Test.py
 tests/TestCuda.py
 tests/test_blur_detection.py
+tests/test_button_colors.py
 tests/test_common_ui.py
 tests/test_duplicate_detection.py
+tests/test_gui_consistency.py
 tests/test_image_classification.py
+tests/test_launcher_fixes.py
