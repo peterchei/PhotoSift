@@ -395,11 +395,20 @@ class ImageUtils:
     
     @staticmethod
     def get_trash_icon_tk(size=48):
-        """Return a PhotoImage of the trash icon, resized to the given size, loaded from resources/Remove.png."""
+        """Return a PhotoImage of the trash icon, resized to the given size, loaded from resources/Trash.png."""
         import os
-        # Get the directory of this module file
-        module_dir = os.path.dirname(os.path.abspath(__file__))
-        icon_path = os.path.join(module_dir, '..', 'resources', 'Trash.png')
+        import sys
+        
+        # Check if running in PyInstaller bundle
+        if getattr(sys, 'frozen', False):
+            # Running as compiled executable (PyInstaller)
+            base_path = sys._MEIPASS
+            icon_path = os.path.join(base_path, 'resources', 'Trash.png')
+        else:
+            # Running as script - use relative path from module
+            module_dir = os.path.dirname(os.path.abspath(__file__))
+            icon_path = os.path.join(module_dir, '..', 'resources', 'Trash.png')
+        
         icon_path = os.path.abspath(icon_path)
         icon_img = Image.open(icon_path).convert('RGBA')
         icon_img = icon_img.resize((size, size), Image.LANCZOS)
