@@ -399,7 +399,7 @@ class ImageUtils:
         import os
         # Get the directory of this module file
         module_dir = os.path.dirname(os.path.abspath(__file__))
-        icon_path = os.path.join(module_dir, '..', 'resources', 'Remove.png')
+        icon_path = os.path.join(module_dir, '..', 'resources', 'Trash.png')
         icon_path = os.path.abspath(icon_path)
         icon_img = Image.open(icon_path).convert('RGBA')
         icon_img = icon_img.resize((size, size), Image.LANCZOS)
@@ -447,7 +447,7 @@ class ImageUtils:
                 width = int(canvas['width']) if 'width' in canvas.keys() else 100
                 height = int(canvas['height']) if 'height' in canvas.keys() else 100
             # Choose icon size (about 40% of min dimension)
-            icon_size = max(24, min(width, height) // 2)
+            icon_size = max(24, max(width, height) // 2)
             if icon_size not in trash_icon_cache:
                 trash_icon_cache[icon_size] = ImageUtils.get_trash_icon_tk(icon_size)
             icon = trash_icon_cache[icon_size]
