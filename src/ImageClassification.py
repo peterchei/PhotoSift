@@ -22,14 +22,22 @@ def get_model_path():
             model_path = "openai/clip-vit-base-patch32"
     return model_path
 
-try:
-    model_path = get_model_path()
-    model = CLIPModel.from_pretrained(model_path).to(device).eval()
-    processor = CLIPProcessor.from_pretrained(model_path)
-except Exception as e:
-    print(f"Error loading model: {str(e)}")
-    print(f"Attempted to load from: {model_path}")
-    raise
+
+model = None
+processor = None
+
+def load_models():
+    global model, processor
+    if model is None or processor is None:
+        try:
+            model_path = get_model_path()
+            print(f"Loading CLIP from {model_path}")
+            model = CLIPModel.from_pretrained(model_path).to(device).eval()
+            processor = CLIPProcessor.from_pretrained(model_path)
+        except Exception as e:
+            print(f"Error loading model: {str(e)}")
+            # Raise to let caller handle it
+            raise e
 
 LABELS = {
     "people": [
@@ -79,6 +87,10 @@ def classify_people_vs_screenshot_batch(paths):
         for p in prompts:
             texts.append(p)
             owners.append(lbl)
+    
+    # Ensure model is loaded
+    load_models()
+    
     inputs = processor(text=texts, images=list(images), return_tensors="pt", padding=True)
     inputs = {k: v.to(device) for k, v in inputs.items()}
     with torch.inference_mode(), torch.autocast(device_type="cuda", dtype=torch.float16, enabled=(device=="cuda")):

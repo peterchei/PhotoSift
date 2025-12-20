@@ -13,15 +13,38 @@ import os
 import traceback
 import logging
 
+import multiprocessing
+
+# CRITICAL: Must be called immediately for Windows PyInstaller multiprocessing
+if __name__ == '__main__':
+    multiprocessing.freeze_support()
+
 # Configure logging for debugging
+log_dir = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'PhotoSift', 'logs')
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, 'photosift_app.log')
+
+# Rotate logs if too large (poor man's rotation to avoid massive files)
+try:
+    if os.path.exists(log_file) and os.path.getsize(log_file) > 1024 * 1024:  # 1MB
+        os.remove(log_file)
+except:
+    pass
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(sys.stdout)
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(log_file, encoding='utf-8')  # Log to file for debugging crashes
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Log startup info
+logger.info("="*50)
+logger.info(f"PhotoSift Starting. Log file: {log_file}")
+logger.info("="*50)
 
 # CRITICAL FIX: Setup Python path for imports
 # This is essential for PyInstaller packaged executables
@@ -44,7 +67,7 @@ try:
     logger.info(f"sys.path: {sys.path[:3]}")
     
 except Exception as e:
-    print(f"ERROR: Failed to setup application path: {e}")
+    logger.error(f"ERROR: Failed to setup application path: {e}")
     traceback.print_exc()
 
 class StartupSplash:
@@ -617,4 +640,6 @@ def show_app_selection():
 
 
 if __name__ == "__main__":
+    if hasattr(multiprocessing, 'freeze_support'):
+        multiprocessing.freeze_support()
     main()

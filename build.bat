@@ -31,7 +31,7 @@ pyinstaller PhotoSift.spec
 if not exist "dist\PhotoSift.exe" (
     echo ERROR: PyInstaller failed to create the executable.
     echo Please check the output above for error messages.
-    pause
+    
     exit /b 1
 )
 
@@ -41,7 +41,7 @@ IF EXIST "%PROGRAMFILES(X86)%\Inno Setup 6\ISCC.exe" (
     "%PROGRAMFILES(X86)%\Inno Setup 6\ISCC.exe" installer.iss
     if errorlevel 1 (
         echo ERROR: Inno Setup failed to create the installer.
-        pause
+        
         exit /b 1
     )
     echo Installer created successfully!
@@ -54,4 +54,3 @@ REM Deactivate virtual environment
 deactivate
 
 echo Build complete! Check the dist directory for the executable and Output directory for the installer.
-pause

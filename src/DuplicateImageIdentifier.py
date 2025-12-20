@@ -8,9 +8,52 @@ from transformers import CLIPModel, CLIPProcessor
 from concurrent.futures import ThreadPoolExecutor
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device).eval()
-processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+import sys
+from pathlib import Path
+from PIL import Image
+import numpy as np
+import cv2
+import torch
+from transformers import CLIPModel, CLIPProcessor
+from concurrent.futures import ThreadPoolExecutor
+import logging
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 IMG_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+
+model = None
+processor = None
+
+def get_model_path():
+    """Get the correct path to the model whether running as script or frozen exe"""
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller bundle
+        base_path = sys._MEIPASS
+        model_path = os.path.join(base_path, 'models', 'clip-vit-base-patch32')
+    else:
+        # Running as script - look for local models folder first
+        local_path = os.path.join('models', 'clip-vit-base-patch32')
+        if os.path.exists(local_path):
+            model_path = local_path
+        else:
+            # Fallback (though in production this should be avoided)
+            model_path = "openai/clip-vit-base-patch32"
+            
+    return model_path
+
+def load_models():
+    """Lazy load models only when needed"""
+    global model, processor
+    if model is None or processor is None:
+        try:
+            model_path = get_model_path()
+            print(f"Loading CLIP model from: {model_path}")
+            model = CLIPModel.from_pretrained(model_path).to(device).eval()
+            processor = CLIPProcessor.from_pretrained(model_path)
+        except Exception as e:
+            print(f"Error loading CLIP model: {e}")
+            # If local load fails, try catch and re-raise or handle
+            raise e
 
 def load_image_cv(path, size=(224, 224)):
     """Load image with Unicode path support (handles Chinese/special characters)"""
@@ -28,6 +71,9 @@ def load_image_cv(path, size=(224, 224)):
         return Image.new("RGB", size)
 
 def get_clip_embedding_batch(img_paths, size=(224, 224)):
+    # Ensure models are loaded
+    load_models()
+    
     with ThreadPoolExecutor(max_workers=16) as executor:
         images = list(executor.map(lambda p: load_image_cv(p, size), img_paths))
     inputs = processor(images=images, return_tensors="pt", padding=True)
@@ -48,6 +94,7 @@ processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 IMG_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
 def get_clip_embedding(img_path):
+    load_models()
     img = Image.open(img_path).convert("RGB").resize((224, 224), Image.BICUBIC)
     inputs = processor(images=img, return_tensors="pt")
     with torch.no_grad():
