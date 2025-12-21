@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="PhotoSift",
-    version="1.4.1",
+    version="1.5.0",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     install_requires=[

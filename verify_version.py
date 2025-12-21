@@ -16,8 +16,8 @@ files_to_check = {
     'create_store_assets.py': (r'PhotoSift v([\d.]+)', 'Store assets display version'),
 }
 
-expected_version = "1.4.0"
-expected_store_version = "1.4.0.0"
+expected_version = "1.5.0"
+expected_store_version = "1.5.0.0"
 all_correct = True
 
 for filename, (pattern, description) in files_to_check.items():

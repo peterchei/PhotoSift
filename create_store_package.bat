@@ -23,7 +23,7 @@ echo         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10
 echo         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"^> >> "store_package\AppxManifest.xml"
 echo   ^<Identity Name="PCAI.PhotoSift" >> "store_package\AppxManifest.xml"
 echo            Publisher="CN=3DE80B9A-18CE-447E-8E83-D1237B056E60" >> "store_package\AppxManifest.xml"
-echo            Version="1.4.1.0" /^> >> "store_package\AppxManifest.xml"
+echo            Version="1.5.0.0" /^> >> "store_package\AppxManifest.xml"
 echo   ^<Properties^> >> "store_package\AppxManifest.xml"
 echo     ^<DisplayName^>PhotoSift^</DisplayName^> >> "store_package\AppxManifest.xml"
 echo     ^<PublisherDisplayName^>PC@AI^</PublisherDisplayName^> >> "store_package\AppxManifest.xml"
