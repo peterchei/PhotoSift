@@ -59,6 +59,18 @@ PhotoSift provides three powerful tools for managing your photo collection:
 - Detailed tooltips explaining blur metrics
 - Zoom controls for inspecting image details
 
+### 4. 🌑 Detect Dark Photos
+- **Brightness analysis** using HSV color space
+- **Multi-threaded batch processing** for fast scanning
+- **Adjustable threshold** - customize sensitivity for your needs
+- **Quality categorization** with levels:
+  - Very Dark (<20)
+  - Dark (20-40)
+  - Dim (40-60)
+  - Good/Bright (>60)
+- **Color-coded scores** for quick visual assessment
+- Zoom controls for inspecting image details
+
 ### Common Features Across All Tools
 - **Modern dark-themed UI** with intuitive controls
 - **Real-time processing** with progress indication
@@ -214,8 +226,10 @@ PhotoSift/
 │   ├── ImageClassification.py   # CLIP-based classification logic
 │   ├── DuplicateImageIdentifierGUI.py  # Duplicate photo finder interface
 │   ├── DuplicateImageIdentifier.py     # Duplicate detection logic
-│   ├── BlurryImageDetectionGUI.py      # Blur detector interface (NEW!)
-│   ├── BlurryImageDetection.py         # Blur detection logic (NEW!)
+│   ├── BlurryImageDetectionGUI.py      # Blur detector interface
+│   ├── BlurryImageDetection.py         # Blur detection logic
+│   ├── DarkImageDetectionGUI.py        # Dark photo detector interface (NEW!)
+│   ├── DarkImageDetection.py           # Dark photo detection logic (NEW!)
 │   ├── CommonUI.py              # Shared UI components and styling
 │   └── ...
 ├── docs/                         # Documentation
@@ -256,6 +270,7 @@ PhotoSift/
    python src/ImageClassifierGUI.py           # Image classifier
    python src/DuplicateImageIdentifierGUI.py  # Duplicate finder
    python src/BlurryImageDetectionGUI.py      # Blur detector
+   python src/DarkImageDetectionGUI.py        # Dark photo detector
    ```
 
 ## How It Works
@@ -313,6 +328,25 @@ Uses the Laplacian variance method to detect out-of-focus or blurry images:
 - Processes multiple images concurrently
 - Progress updates in real-time as tasks complete
 - Dramatically faster than sequential processing
+
+### Dark Photo Detection (NEW!)
+Uses HSV (Hue, Saturation, Value) color space analysis to detect underexposed images:
+- Converts images to HSV to isolate the **Value (brightness)** component
+- Calculates the average pixel intensity across the entire image
+- **Multi-threaded batch processing** for optimal performance
+- Uses concurrent processing with up to 8 parallel workers
+
+**How Dark Photo Detection Works:**
+1. **Color Space Conversion**: Translates image data to the HSV model
+2. **Brightness Analysis**: Measures the average 'Value' channel intensity (0-255)
+3. **Threshold Comparison**: Images scoring below the user-defined threshold are flagged
+4. **Quality Categorization**: Groups images based on their average brightness level
+
+**Brightness Score Interpretation:**
+- **<20**: Very Dark - Minimal detail visible
+- **20-40**: Dark - Noticeably underexposed
+- **40-60**: Dim - Slightly underexposed
+- **>60**: Good/Bright - Well-exposed image
 
 ## AI-Human Collaborative Development Process
 
