@@ -365,10 +365,16 @@ def preload_models():
                 try:
                     from DuplicateImageIdentifier import get_clip_embedding_batch
                     logger.info("DuplicateImageIdentifier loaded successfully")
-                    splash.root.after(0, lambda: smooth_update_progress("Finalizing", 90, 800))
-                    time.sleep(0.8)
                 except ImportError as e:
                     raise Exception(f"Failed to import DuplicateImageIdentifier: {e}")
+                
+                try:
+                    from DarkImageDetection import DarkImageDetector
+                    logger.info("DarkImageDetection loaded successfully")
+                    splash.root.after(0, lambda: smooth_update_progress("Finalizing", 90, 800))
+                    time.sleep(0.5)
+                except ImportError as e:
+                    raise Exception(f"Failed to import DarkImageDetection: {e}")
                 
                 # Step 4: UI components
                 try:
@@ -489,7 +495,7 @@ def show_app_selection():
     # Create selection window
     selection_window = tk.Tk()
     selection_window.title("PhotoSift - Select Feature")
-    selection_window.geometry("500x300")  # Increased both width and height
+    selection_window.geometry("500x400")  # Increased height to accommodate more buttons
     selection_window.configure(bg='#1e293b')
     selection_window.resizable(False, False)
     
@@ -504,8 +510,8 @@ def show_app_selection():
     # Center window
     selection_window.update_idletasks()
     x = (selection_window.winfo_screenwidth() // 2) - (500 // 2)
-    y = (selection_window.winfo_screenheight() // 2) - (300 // 2)
-    selection_window.geometry(f"500x300+{x}+{y}")
+    y = (selection_window.winfo_screenheight() // 2) - (400 // 2)
+    selection_window.geometry(f"500x400+{x}+{y}")
     
     # Create main frame (also draggable)
     main_frame = tk.Frame(selection_window, bg='#1e293b', padx=30, pady=20)
@@ -583,6 +589,23 @@ def show_app_selection():
             traceback.print_exc()
             show_app_selection()
     
+    def launch_dark_detector():
+        """Launch DarkImageDetectionGUI and destroy selection window"""
+        selection_window.destroy()  # Completely destroy to avoid conflicts
+        try:
+            from DarkImageDetectionGUI import DarkImageDetectionApp
+            # Create a new Tk instance
+            app_root = tk.Tk()
+            app = DarkImageDetectionApp(app_root)
+            app_root.mainloop()
+            # After app closes, show selection again
+            show_app_selection()
+        except Exception as e:
+            print(f"Error launching DarkImageDetectionGUI: {e}")
+            import traceback
+            traceback.print_exc()
+            show_app_selection()
+
     # Identify unwanted photo button
     unwanted_btn = tk.Button(button_frame,
                             text="🧹 Identify Unwanted Photos",
@@ -627,6 +650,21 @@ def show_app_selection():
                              padx=20, pady=5,
                              height=1)
     blurry_btn.pack(pady=5, fill=tk.X)
+
+    # Identify dark photo button
+    dark_btn = tk.Button(button_frame,
+                             text="🌑 Detect Dark Photos",
+                             command=launch_dark_detector,
+                             font=("Segoe UI", 12, "bold"),
+                             bg='#64748b',  # Slate/Dark color
+                             fg='#f1f5f9',
+                             activebackground='#475569',
+                             activeforeground='#f1f5f9',
+                             bd=0, relief=tk.FLAT,
+                             cursor="hand2",
+                             padx=20, pady=5,
+                             height=1)
+    dark_btn.pack(pady=5, fill=tk.X)
     
     # Ensure window is visible and on top
     selection_window.lift()
