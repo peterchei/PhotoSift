@@ -18,7 +18,7 @@ DisableProgramGroupPage=yes
 ; Remove the following line to run in administrative install mode (install for all users.)
 PrivilegesRequired=lowest
 OutputBaseFilename=PhotoSift_Setup
-Compression=lzma2/max
+Compression=lzma2/normal
 SolidCompression=yes
 WizardStyle=modern
 

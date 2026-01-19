@@ -18,7 +18,6 @@ a = Analysis(
         'PIL.Image',
         'PIL.ImageTk',
         'cv2',
-        'opencv-python',
         
         # AI/ML libraries  
         'torch', 
@@ -94,7 +93,12 @@ a = Analysis(
         'DuplicateImageIdentifier',
         'DuplicateImageIdentifierGUI',
         'CommonUI',
-        'launchPhotoSiftApp'
+        'launchPhotoSiftApp',
+        
+        # Additional suspected missing imports for Torch/Transformers
+        'torch.distributed',
+        'torch.ao.quantization',
+        'tqdm'
     ],
     hookspath=[],
     hooksconfig={},
@@ -118,7 +122,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
