@@ -16,7 +16,7 @@ if not exist "setup.py" (
 echo [1/6] Running regression tests...
 echo ----------------------------------------------------------------
 cd tests
-python run_all_tests.py
+python run_all_tests.pypython.exe -m pip install --upgrade pippython.exe -m pip install --upgrade pip
 if errorlevel 1 (
     echo.
     echo ERROR: Tests failed! Please fix failing tests before releasing.
