@@ -76,7 +76,7 @@ PhotoSift provides three powerful tools for managing your photo collection:
 - **Real-time processing** with progress indication
 - **Thumbnail view** with responsive grid layout
 - **Batch operations** - process hundreds of images efficiently
-- **Safe cleaning** - moves unwanted photos to trash (recoverable)
+- **Safe cleaning** - moves unwanted photos to trash folder (recoverable)
 - **Trash manager** - easily review and restore deleted items
 - **Page-by-page navigation** for large collections (50 images per page)
 - **Full image viewer** with EXIF data display
