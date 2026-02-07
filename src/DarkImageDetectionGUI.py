@@ -24,7 +24,14 @@ class DarkImageDetectionApp:
         self.root = root
         self.root.title("PhotoSift - Dark Photo Detector")
         # Maximize window on startup
-        self.root.state('zoomed')  # Windows maximized state
+        import sys
+        if sys.platform.startswith('win'):
+            self.root.state('zoomed')
+        else:
+            try:
+                self.root.attributes('-zoomed', True)
+            except:
+                pass
 
         self.folder = ""
         self.dark_images = []

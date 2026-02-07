@@ -13,7 +13,14 @@ class DuplicateImageIdentifierApp:
     def __init__(self, root):
         self.root = root
         self.root.title("PhotoSift - Duplicate Image Identifier")
-        self.root.state('zoomed')  # Start maximized
+        import sys
+        if sys.platform.startswith('win'):
+            self.root.state('zoomed')
+        else:
+            try:
+                self.root.attributes('-zoomed', True)
+            except:
+                pass
         
         # Use centralized color scheme
         self.colors = ModernColors.get_color_scheme()

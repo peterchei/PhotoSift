@@ -24,7 +24,14 @@ class BlurryImageDetectionApp:
         self.root = root
         self.root.title("PhotoSift - Blurry Image Detector")
         # Maximize window on startup
-        self.root.state('zoomed')  # Windows maximized state
+        import sys
+        if sys.platform.startswith('win'):
+            self.root.state('zoomed')
+        else:
+            try:
+                self.root.attributes('-zoomed', True)
+            except:
+                pass # Fallback for window managers that don't support zoomed attribute
 
         self.folder = ""
         self.blurry_images = []

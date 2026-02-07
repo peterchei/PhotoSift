@@ -188,7 +188,14 @@ class ImageClassifierApp:
         self.root = root
         self.root.title("PhotoSift - Unwanted Photo Identifier")
         # Maximize window on startup
-        self.root.state('zoomed')  # Windows maximized state
+        import sys
+        if sys.platform.startswith('win'):
+            self.root.state('zoomed')
+        else:
+            try:
+                self.root.attributes('-zoomed', True)
+            except:
+                pass
         self.folder = None
         self.images = []
         self.current = 0
