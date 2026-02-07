@@ -94,7 +94,13 @@ def classify_people_vs_screenshot_batch(paths):
     inputs = processor(text=texts, images=list(images), return_tensors="pt", padding=True)
     inputs = {k: v.to(device) for k, v in inputs.items()}
     with torch.inference_mode(), torch.autocast(device_type="cuda", dtype=torch.float16, enabled=(device=="cuda")):
-        out = model(**inputs).logits_per_image  # [batch, num_prompts]
+        outputs = model(**inputs)
+        # Handle cases where model returns an object instead of a tensor
+        if hasattr(outputs, "logits_per_image"):
+            out = outputs.logits_per_image
+        else:
+            out = outputs # Fallback if it's already a tensor
+            
         probs = out.softmax(dim=-1).float().cpu().numpy()  # [batch, num_prompts]
     owners = np.array(owners)
     results = []

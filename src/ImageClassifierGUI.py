@@ -194,13 +194,18 @@ class ImageClassifierApp:
                 self.root.state('zoomed')
             except: pass
         else:
+            # On Linux, geometry with winfo_screenwidth often fails if called too early
+            # Use a large percentage of the screen or a fixed large size
             try:
-                # Use a standard geometry for Linux to avoid 'zoomed' issues
-                screen_width = self.root.winfo_screenwidth()
-                screen_height = self.root.winfo_screenheight()
-                self.root.geometry(f"{screen_width}x{screen_height}+0+0")
+                self.root.update_idletasks()
+                width = self.root.winfo_screenwidth()
+                height = self.root.winfo_screenheight()
+                if width > 100:
+                    self.root.geometry(f"{int(width*0.9)}x{int(height*0.9)}+50+50")
+                else:
+                    self.root.geometry("1200x800+50+50")
             except:
-                pass
+                self.root.geometry("1200x800+50+50")
         self.folder = None
         self.images = []
         self.current = 0
@@ -279,7 +284,9 @@ class ImageClassifierApp:
             
             # Try direct widget configuration as backup
             try:
-                self.tree.configure(background=self.colors['bg_card'])
+                # Treeview configuration is done via style, but some versions allow config
+                # Skip background config as it often fails on Linux ttk themes
+                pass
             except Exception as widget_error:
                 print(f"Direct widget config failed: {widget_error}")
             

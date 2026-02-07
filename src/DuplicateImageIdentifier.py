@@ -81,6 +81,9 @@ def get_clip_embedding_batch(img_paths, size=(224, 224)):
     # Generate embeddings
     with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.float16, enabled=(device=="cuda")):
         image_features = model.get_image_features(**{k: v.to(device) for k, v in inputs.items()})
+        # Handle cases where model returns an object instead of a tensor (common in newer transformers)
+        if hasattr(image_features, "pooler_output"):
+            image_features = image_features.pooler_output
     
     return image_features.cpu().numpy()
 

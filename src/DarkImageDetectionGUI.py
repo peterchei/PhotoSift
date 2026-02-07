@@ -31,11 +31,15 @@ class DarkImageDetectionApp:
             except: pass
         else:
             try:
-                screen_width = self.root.winfo_screenwidth()
-                screen_height = self.root.winfo_screenheight()
-                self.root.geometry(f"{screen_width}x{screen_height}+0+0")
+                self.root.update_idletasks()
+                width = self.root.winfo_screenwidth()
+                height = self.root.winfo_screenheight()
+                if width > 100:
+                    self.root.geometry(f"{int(width*0.9)}x{int(height*0.9)}+50+50")
+                else:
+                    self.root.geometry("1200x800+50+50")
             except:
-                pass
+                self.root.geometry("1200x800+50+50")
 
         self.folder = ""
         self.dark_images = []
