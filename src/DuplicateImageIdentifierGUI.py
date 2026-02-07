@@ -15,10 +15,14 @@ class DuplicateImageIdentifierApp:
         self.root.title("PhotoSift - Duplicate Image Identifier")
         import sys
         if sys.platform.startswith('win'):
-            self.root.state('zoomed')
+            try:
+                self.root.state('zoomed')
+            except: pass
         else:
             try:
-                self.root.attributes('-zoomed', True)
+                screen_width = self.root.winfo_screenwidth()
+                screen_height = self.root.winfo_screenheight()
+                self.root.geometry(f"{screen_width}x{screen_height}+0+0")
             except:
                 pass
         
