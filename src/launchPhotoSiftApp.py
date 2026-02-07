@@ -1,59 +1,42 @@
 """
 PhotoSift Application Launcher
-Final Linux stability version
+Final Stability Version (Cross-Platform)
 """
 
-import os, sys, time, logging, multiprocessing
+import os
+import sys
+import platform
 
-# Configure logging
-log_dir = os.path.join(os.path.expanduser('~'), 'PhotoSift', 'logs')
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, 'photosift_app.log')
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s',
-                    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler(log_file)])
-logger = logging.getLogger(__name__)
+# 1. SETUP PATH
+application_path = os.path.dirname(os.path.abspath(__file__))
+if os.path.basename(application_path) == 'src':
+    src_dir = application_path
+    root_dir = os.path.dirname(application_path)
+else:
+    src_dir = os.path.join(application_path, 'src')
+    root_dir = application_path
+
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
 def main():
-    logger.info("Starting PhotoSift Launcher...")
+    IS_WINDOWS = platform.system() == "Windows"
     
-    # Setup path
-    application_path = os.path.dirname(os.path.abspath(__file__))
-    if application_path not in sys.path:
-        sys.path.insert(0, application_path)
-
-    # 1. Basic UI Setup
-    import tkinter as tk
-    root = tk.Tk()
-    root.title("PhotoSift")
-    root.geometry("500x550")
-    root.configure(bg='#1e293b')
-    
-    # Center window
-    root.update_idletasks()
-    x = (root.winfo_screenwidth() // 2) - (500 // 2)
-    y = (root.winfo_screenheight() // 2) - (550 // 2)
-    root.geometry(f"+{x}+{y}")
-    
-    label = tk.Label(root, text="PhotoSift", font=("Segoe UI", 26, "bold"), 
-             bg='#1e293b', fg='#3b82f6')
-    label.pack(pady=(40, 10))
-    
-    status = tk.Label(root, text="Loading AI modules...", font=("Segoe UI", 12), 
-             bg='#1e293b', fg='#94a3b8')
-    status.pack(pady=(0, 30))
-    root.update()
-
-    # 2. Sequential Imports
+    # 2. LOAD AI STACK
+    print("Loading AI core components...")
     try:
-        logger.info("Importing AI stack...")
+        import numpy as np
         from PIL import Image, ImageTk
-        import torch
         import cv2
+        import torch
         from transformers import CLIPModel, CLIPProcessor
-        
-        status.config(text="Loading application logic...")
-        root.update()
-        
+    except Exception as e:
+        print(f"Failed to load AI stack: {e}")
+        return
+
+    # 3. LOAD APPLICATION LOGIC
+    print("Loading application logic...")
+    try:
         import ImageClassification
         import DuplicateImageIdentifier
         import DarkImageDetection
@@ -65,54 +48,89 @@ def main():
         from BlurryImageDetectionGUI import BlurryImageDetectionApp
         from DarkImageDetectionGUI import DarkImageDetectionApp
     except Exception as e:
-        logger.error(f"Import failed: {e}")
-        status.config(text=f"Error: {e}", fg="red")
-        root.update()
+        print(f"Failed to load modules: {e}")
         return
 
-    # 3. Build Selection Menu
-    status.config(text="AI-Powered Image Management")
+    # 4. INITIALIZE UI
+    print("Initializing User Interface...")
+    import tkinter as tk
+    from tkinter import messagebox
+    
+    root = tk.Tk()
+    root.title("PhotoSift")
+    root.geometry("500x550")
+    root.configure(bg='#1e293b')
+    
+    # Safe Icon handling (Windows only for .ico)
+    if IS_WINDOWS:
+        try:
+            icon_path = os.path.join(root_dir, "resources", "app.ico")
+            if os.path.exists(icon_path):
+                root.iconbitmap(icon_path)
+        except: pass
+    else:
+        # Linux/macOS safe icon
+        try:
+            icon_path = os.path.join(root_dir, "resources", "app.ico")
+            if os.path.exists(icon_path):
+                img = Image.open(icon_path)
+                icon_img = ImageTk.PhotoImage(img.resize((32, 32)))
+                root.wm_iconphoto(True, icon_img)
+                root._icon = icon_img
+        except: pass
+
+    # Center window
+    root.update_idletasks()
+    x = (root.winfo_screenwidth() // 2) - (500 // 2)
+    y = (root.winfo_screenheight() // 2) - (550 // 2)
+    root.geometry(f"+{x}+{y}")
+
+    # Use safe fonts and text
+    main_font = ("Segoe UI", 26, "bold") if IS_WINDOWS else ("Arial", 24, "bold")
+    sub_font = ("Segoe UI", 12) if IS_WINDOWS else ("Arial", 11)
+    btn_font = ("Segoe UI", 12, "bold") if IS_WINDOWS else ("Arial", 11, "bold")
+
+    tk.Label(root, text="PhotoSift", font=main_font, 
+             bg='#1e293b', fg='#3b82f6').pack(pady=(40, 10))
+    
+    tk.Label(root, text="AI-Powered Image Management", font=sub_font, 
+             bg='#1e293b', fg='#94a3b8').pack(pady=(0, 30))
+    
     btn_frame = tk.Frame(root, bg='#1e293b')
     btn_frame.pack(fill=tk.X, padx=60)
 
     def launch_tool(cls):
-        # Critical: Try-except and manual sizing for Toplevel
         try:
             tool_win = tk.Toplevel(root)
-            # Do NOT use state('zoomed') here, let the class handle it safely
+            # Standard geometry for Linux stability
+            if not IS_WINDOWS:
+                sw = root.winfo_screenwidth()
+                sh = root.winfo_screenheight()
+                tool_win.geometry(f"{sw}x{sh}+0+0")
             app = cls(tool_win)
-        except Exception as tool_e:
-            logger.error(f"Failed to launch tool: {tool_e}")
-            from tkinter import messagebox
-            messagebox.showerror("Tool Error", f"Failed to launch: {tool_e}")
+        except Exception as e:
+            print(f"Tool launch failed: {e}")
+            messagebox.showerror("Error", str(e))
 
+    # Remove emojis on Linux to prevent font-renderer crashes
     apps = [
-        ("🧹 Identify Unwanted Photos", ImageClassifierApp, '#3b82f6'),
-        ("🔍 Identify Duplicate Photos", DuplicateImageIdentifierApp, '#10b981'),
-        ("🌫️ Detect Blurry Photos", BlurryImageDetectionApp, '#f97316'),
-        ("🌑 Detect Dark Photos", DarkImageDetectionApp, '#64748b')
+        (("🧹 " if IS_WINDOWS else "") + "Identify Unwanted Photos", ImageClassifierApp, '#3b82f6'),
+        (("🔍 " if IS_WINDOWS else "") + "Identify Duplicate Photos", DuplicateImageIdentifierApp, '#10b981'),
+        (("🌫️ " if IS_WINDOWS else "") + "Detect Blurry Photos", BlurryImageDetectionApp, '#f97316'),
+        (("🌑 " if IS_WINDOWS else "") + "Detect Dark Photos", DarkImageDetectionApp, '#64748b')
     ]
 
     for text, cls, color in apps:
-        tk.Button(btn_frame, text=text, command=lambda c=cls: launch_tool(c),
-                 font=("Segoe UI", 12, "bold"), bg=color, fg='white',
-                 activebackground=color, activeforeground='white',
+        tk.Button(btn_frame, text=text, font=btn_font, command=lambda c=cls: launch_tool(c),
+                 bg=color, fg='white', activebackground=color, activeforeground='white',
                  bd=0, relief=tk.FLAT, cursor="hand2", pady=12).pack(pady=8, fill=tk.X)
-    
-    # Final safe icon
-    try:
-        icon_path = os.path.join(os.path.dirname(application_path), "resources", "app.ico")
-        if os.path.exists(icon_path):
-            img = Image.open(icon_path)
-            icon_img = ImageTk.PhotoImage(img.resize((32, 32)))
-            root.wm_iconphoto(True, icon_img)
-            root._icon = icon_img
-    except: pass
 
-    logger.info("Launcher ready.")
+    print("PhotoSift is ready.")
     root.mainloop()
 
 if __name__ == "__main__":
-    if sys.platform == 'win32':
+    # multiprocessing.freeze_support() only on Windows
+    if platform.system() == "Windows":
+        import multiprocessing
         multiprocessing.freeze_support()
     main()
