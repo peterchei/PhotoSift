@@ -9,13 +9,13 @@ import subprocess
 import time
 
 print("=" * 70)
-print("PhotoSift v1.3.0 - MS Store Crash Fixes Verification")
+print("PhotoSift v1.6.0 - MS Store Crash Fixes Verification")
 print("=" * 70)
 
 # Test 1: Python syntax check
 print("\n[Test 1] Checking Python syntax...")
 result = subprocess.run(
-    [sys.executable, "-m", "py_compile", "src/launchPhotosiftApp.py"],
+    [sys.executable, "-m", "py_compile", "src/launchPhotoSiftApp.py"],
     capture_output=True,
     text=True
 )
@@ -32,7 +32,7 @@ print("\n[Test 2] Checking imports...")
 try:
     # Get absolute path to src directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    src_dir = os.path.join(script_dir, "src")
+    src_dir = os.path.join(os.path.dirname(script_dir), "src")
     
     if not os.path.exists(src_dir):
         raise Exception(f"src directory not found at: {src_dir}")
@@ -40,9 +40,9 @@ try:
     sys.path.insert(0, src_dir)
     
     # Check if file exists
-    launcher_path = os.path.join(src_dir, "launchPhotosiftApp.py")
+    launcher_path = os.path.join(src_dir, "launchPhotoSiftApp.py")
     if not os.path.exists(launcher_path):
-        raise Exception(f"launchPhotosiftApp.py not found at: {launcher_path}")
+        raise Exception(f"launchPhotoSiftApp.py not found at: {launcher_path}")
     
     print("✅ PASS: File exists and is importable")
 except Exception as e:
@@ -51,7 +51,7 @@ except Exception as e:
 
 # Test 3: Check for required additions
 print("\n[Test 3] Verifying crash fix implementations...")
-with open("src/launchPhotosiftApp.py", "r", encoding="utf-8") as f:
+with open("src/launchPhotoSiftApp.py", "r", encoding="utf-8") as f:
     content = f.read()
     
     checks = [
@@ -86,12 +86,13 @@ with open("src/launchPhotosiftApp.py", "r", encoding="utf-8") as f:
 # Test 4: Check version consistency
 print("\n[Test 4] Checking version consistency...")
 version_checks_passed = True
+current_version = "1.6.0"
 
 # Check setup.py
 with open("setup.py", "r", encoding="utf-8") as f:
     setup_content = f.read()
-    if 'version="1.3.0"' in setup_content or "version='1.3.0'" in setup_content:
-        print("  ✅ setup.py: 1.3.0")
+    if f'version="{current_version}"' in setup_content or f"version='{current_version}'" in setup_content:
+        print(f"  ✅ setup.py: {current_version}")
     else:
         print("  ❌ setup.py: version mismatch")
         version_checks_passed = False
@@ -100,8 +101,8 @@ with open("setup.py", "r", encoding="utf-8") as f:
 if os.path.exists("version_info.txt"):
     with open("version_info.txt", "r", encoding="utf-8") as f:
         version_content = f.read()
-        if "1.3.0" in version_content:
-            print("  ✅ version_info.txt: 1.3.0")
+        if current_version in version_content:
+            print(f"  ✅ version_info.txt: {current_version}")
         else:
             print("  ❌ version_info.txt: version mismatch")
             version_checks_passed = False
@@ -110,14 +111,14 @@ if os.path.exists("version_info.txt"):
 if os.path.exists("create_store_package.bat"):
     with open("create_store_package.bat", "r", encoding="utf-8") as f:
         bat_content = f.read()
-        if "1.3.0" in bat_content:
-            print("  ✅ create_store_package.bat: 1.3.0")
+        if current_version in bat_content:
+            print(f"  ✅ create_store_package.bat: {current_version}")
         else:
             print("  ❌ create_store_package.bat: version mismatch")
             version_checks_passed = False
 
 if version_checks_passed:
-    print("\n✅ PASS: All versions are 1.3.0")
+    print(f"\n✅ PASS: All versions are {current_version}")
 else:
     print("\n❌ FAIL: Version inconsistencies found")
     sys.exit(1)

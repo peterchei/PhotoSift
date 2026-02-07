@@ -32,3 +32,4 @@ resources/redesign the window .png
 .DS_Store
 Thumbs.db
 PhotoSift*.msix
+build_env_linux/

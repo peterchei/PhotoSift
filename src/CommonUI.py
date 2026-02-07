@@ -816,8 +816,23 @@ class TrashManager:
         trash_dir = os.path.join(folder, "Trash")
         
         if os.path.exists(trash_dir):
-            # Open folder in Windows Explorer
-            os.startfile(trash_dir)
+            # Open folder in system file explorer
+            import platform
+            import subprocess
+            
+            if platform.system() == "Windows":
+                os.startfile(trash_dir)
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", trash_dir])
+            else:  # Linux
+                try:
+                    subprocess.run(["xdg-open", trash_dir])
+                except FileNotFoundError:
+                    # Fallback for some Linux environments
+                    try:
+                        subprocess.run(["gio", "open", trash_dir])
+                    except FileNotFoundError:
+                        print(f"Could not open folder: {trash_dir}")
         else:
             if self.button_style == "emoji":
                 tk.messagebox.showinfo("Trash Empty", f"No Trash folder found at:\n{trash_dir}\n\nNo items have been cleaned yet.")
