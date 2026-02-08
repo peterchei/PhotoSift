@@ -52,9 +52,40 @@ def load_models():
             logger.error(f"Error loading CLIP model: {e}")
             raise e
 
+def _ensure_tensor(obj):
+    """Helper to extract a raw tensor from various ModelOutput containers"""
+    if torch.is_tensor(obj):
+        return obj
+    
+    # Try common CLIP/Vision attributes
+    for attr in ["pooler_output", "logits_per_image", "last_hidden_state"]:
+        val = getattr(obj, attr, None)
+        if val is not None and torch.is_tensor(val):
+            return val
+            
+    # Try dictionary-like access
+    try:
+        for key in ["pooler_output", "logits_per_image", "last_hidden_state"]:
+            if key in obj and obj[key] is not None:
+                return obj[key]
+    except:
+        pass
+        
+    # Try indexing (tuple-like)
+    try:
+        if len(obj) > 0 and torch.is_tensor(obj[0]):
+            return obj[0]
+    except:
+        pass
+        
+    return obj
+
 def load_image_cv(path, size=(224, 224)):
     """Load image with Unicode path support and high-quality resizing"""
     try:
+        if os.path.isdir(path):
+            return None
+            
         # Use PIL to load the image first (handles Unicode paths properly)
         img = Image.open(path).convert("RGB")
         
@@ -75,15 +106,18 @@ def get_clip_embedding_batch(img_paths, size=(224, 224)):
     with ThreadPoolExecutor(max_workers=8) as executor:
         images = list(executor.map(lambda p: load_image_cv(p, size), img_paths))
     
+    # Filter out None from directory hits
+    valid = [img for img in images if img is not None]
+    if not valid:
+        return np.zeros((len(img_paths), 512))
+        
     # Prepare inputs
-    inputs = processor(images=images, return_tensors="pt", padding=True)
+    inputs = processor(images=valid, return_tensors="pt", padding=True)
     
     # Generate embeddings
     with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.float16, enabled=(device=="cuda")):
         image_features = model.get_image_features(**{k: v.to(device) for k, v in inputs.items()})
-        # Handle cases where model returns an object instead of a tensor (common in newer transformers)
-        if hasattr(image_features, "pooler_output"):
-            image_features = image_features.pooler_output
+        image_features = _ensure_tensor(image_features)
     
     return image_features.cpu().numpy()
 
