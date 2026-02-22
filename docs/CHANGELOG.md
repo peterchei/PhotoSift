@@ -5,6 +5,37 @@ All notable changes to PhotoSift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-02-22
+
+### Added
+- **Low Resolution Detector** — new fifth tool in the PhotoSift launcher
+  - Scans folders for images below a user-defined minimum width × height
+  - Pure PIL implementation (no OpenCV, no CLIP, no GPU) — fastest scanner in PhotoSift
+  - Separate W × H spinboxes with 480p / 720p HD / 1080p FHD preset buttons
+  - Seven quality categories: Tiny / Low / SD / HD / Full HD / High Res / Ultra HD
+  - Results show actual pixel dimensions per image (e.g., "1024 × 768 (SD)")
+  - Full thumbnail grid, zoom controls, select/clean flow — consistent with all other tools
+  - Details documented in `LOW_RESOLUTION_DETECTOR.md`
+- **test_dark_detection.py** — 27 new tests for Dark Photo Detection (feature previously had zero test coverage)
+  - 17 unit tests covering quality boundaries, thresholds, batch function signatures, empty folder, Trash exclusion, result dict keys
+  - 10 integration tests using synthetic PIL images written to disk
+
+### Fixed
+- **CommonUI.py** — `img._getexif()` replaced with `img.getexif()` (deprecated private PIL API removed in Pillow 8+)
+- **DarkImageDetectionGUI.py** — `get_thumbnail()` returning `None` caused `AttributeError` crash (`img_tk.width()` on None); added None guard with "No Preview" placeholder canvas
+- **DarkImageDetectionGUI.py** — missing `img_canvas.image = img_tk` reference caused PhotoImage garbage collection (blank thumbnails)
+- **DarkImageDetectionGUI.py** — bare `except:` clause replaced with `except Exception:` (was silently catching `SystemExit` / `KeyboardInterrupt`)
+- **BlurryImageDetectionGUI.py** — same `get_thumbnail()` None crash as above; added None guard with placeholder canvas
+- **DuplicateImageIdentifier.py** — accidental duplicate code block loaded CLIP model at import time, overriding lazy loading and causing the full ~350 MB model to load on every `import DuplicateImageIdentifier`
+
+### Test fixes
+- **test_duplicate_detection.py** — `test_empty_image_list` incorrectly asserted `isinstance(result, dict)`; `get_clip_embedding_batch` returns `numpy.ndarray`; updated assertion to `np.ndarray` with `result.shape[0] == 0`
+- **test_image_classification.py** — `test_confidence_score_range` contained only `self.assertTrue(True)` (placeholder); replaced with a real softmax bounds check
+
+### Documentation
+- Added `docs/code_review_v1.6.0.md` — full code review report covering all five bugs and test coverage changes
+- Added `docs/LOW_RESOLUTION_DETECTOR.md` — design document for the new Low Resolution Detector feature
+
 ## [1.4.0] - 2025-10-19
 
 ### Added
