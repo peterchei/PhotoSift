@@ -456,10 +456,17 @@ class DarkImageDetectionApp:
 
             img_tk = self.get_thumbnail(path)
             self.thumb_imgs.append(img_tk)
-            img_canvas = tk.Canvas(card, width=img_tk.width(), height=img_tk.height(), bg=self.colors['bg_card'], highlightthickness=0, bd=0)
-            img_canvas.pack(pady=5)
-            img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
-            img_canvas.bind('<Double-Button-1>', lambda e, p=path: self.open_full_image(p))
+            if img_tk is not None:
+                img_canvas = tk.Canvas(card, width=img_tk.width(), height=img_tk.height(), bg=self.colors['bg_card'], highlightthickness=0, bd=0)
+                img_canvas.pack(pady=5)
+                img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
+                img_canvas.image = img_tk  # Keep reference to prevent GC blanking
+                img_canvas.bind('<Double-Button-1>', lambda e, p=path: self.open_full_image(p))
+            else:
+                img_canvas = tk.Canvas(card, width=self.thumb_size[0], height=self.thumb_size[1], bg=self.colors['bg_card'], highlightthickness=0, bd=0)
+                img_canvas.pack(pady=5)
+                img_canvas.create_text(self.thumb_size[0]//2, self.thumb_size[1]//2, text="No Preview", fill=self.colors.get('text_secondary', 'gray'))
+                img_canvas.bind('<Double-Button-1>', lambda e, p=path: self.open_full_image(p))
 
             info_frame = tk.Frame(card, bg=self.colors['bg_card'])
             info_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -492,7 +499,7 @@ class DarkImageDetectionApp:
             img_tk = ImageTk.PhotoImage(img)
             self.image_cache[cache_key] = img_tk
             return img_tk
-        except: return None
+        except Exception: return None
 
     def update_page_controls(self):
         total_pages = max(1, (len(self.current_paths) - 1) // self.page_size + 1)

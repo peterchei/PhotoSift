@@ -547,7 +547,7 @@ class ImageUtils:
             # Extract EXIF data if available
             exif_data = {}
             try:
-                exif = img._getexif()
+                exif = img.getexif()
                 if exif:
                     from PIL.ExifTags import TAGS, GPSTAGS
                     

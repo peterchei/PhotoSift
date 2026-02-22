@@ -1,13 +1,4 @@
 import os
-from pathlib import Path
-from PIL import Image
-import numpy as np
-import cv2
-import torch
-from transformers import CLIPModel, CLIPProcessor
-from concurrent.futures import ThreadPoolExecutor
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
 import sys
 from pathlib import Path
 from PIL import Image
@@ -80,18 +71,6 @@ def get_clip_embedding_batch(img_paths, size=(224, 224)):
     with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.float16, enabled=(device=="cuda")):
         image_features = model.get_image_features(**{k: v.to(device) for k, v in inputs.items()})
     return image_features.cpu().numpy()
-import os
-from pathlib import Path
-from PIL import Image
-import numpy as np
-
-import torch
-from transformers import CLIPModel, CLIPProcessor
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device).eval()
-processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-IMG_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
 def get_clip_embedding(img_path):
     load_models()
