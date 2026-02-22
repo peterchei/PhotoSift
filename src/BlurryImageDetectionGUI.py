@@ -519,16 +519,23 @@ class BlurryImageDetectionApp:
             self.thumb_imgs.append(img_tk)
 
             # Canvas for image with overlay support
-            img_canvas = tk.Canvas(img_container, 
-                                 width=img_tk.width(), 
-                                 height=img_tk.height(),
-                                 bg=self.colors['bg_card'], 
-                                 highlightthickness=0, bd=0)
-            img_canvas.pack()
-            
-            # Draw image on canvas
-            img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
-            img_canvas.image = img_tk  # Keep reference
+            if img_tk is not None:
+                img_canvas = tk.Canvas(img_container,
+                                     width=img_tk.width(),
+                                     height=img_tk.height(),
+                                     bg=self.colors['bg_card'],
+                                     highlightthickness=0, bd=0)
+                img_canvas.pack()
+                img_canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
+                img_canvas.image = img_tk  # Keep reference
+            else:
+                img_canvas = tk.Canvas(img_container,
+                                     width=self.thumb_size[0],
+                                     height=self.thumb_size[1],
+                                     bg=self.colors['bg_card'],
+                                     highlightthickness=0, bd=0)
+                img_canvas.pack()
+                img_canvas.create_text(self.thumb_size[0]//2, self.thumb_size[1]//2, text="No Preview", fill=self.colors.get('text_secondary', 'gray'))
             
             # Store canvas reference for overlay updates
             setattr(img_canvas, 'img_path', path)

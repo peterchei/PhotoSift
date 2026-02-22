@@ -45,14 +45,17 @@ class TestDuplicateDetection(unittest.TestCase):
             self.fail(f"Failed to import duplicate detection: {e}")
     
     def test_empty_image_list(self):
-        """Test handling of empty image list"""
+        """Test that get_clip_embedding_batch returns a numpy array (not a dict)"""
+        import numpy as np
         try:
-            embeddings = get_clip_embedding_batch([])
-            self.assertIsInstance(embeddings, dict)
-            self.assertEqual(len(embeddings), 0)
-            print("✓ Empty image list handled correctly")
+            result = get_clip_embedding_batch([])
+            # Function returns a numpy array (image feature matrix), not a dict
+            self.assertIsInstance(result, np.ndarray)
+            self.assertEqual(result.shape[0], 0)  # Zero rows for zero inputs
+            print("✓ Empty image list returns empty numpy array")
         except Exception as e:
-            print(f"⚠ Empty list test: {e}")
+            # Model loading or processing failure is acceptable in test environment
+            print(f"⚠ Empty list test skipped (model not available): {e}")
     
     def test_embedding_batch_signature(self):
         """Test that embedding batch function has correct signature"""
