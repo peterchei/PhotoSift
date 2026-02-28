@@ -495,7 +495,7 @@ def show_app_selection():
     # Create selection window
     selection_window = tk.Tk()
     selection_window.title("PhotoSift - Select Feature")
-    selection_window.geometry("500x450")  # Increased height to accommodate more buttons
+    selection_window.geometry("500x500")  # Increased height to accommodate more buttons
     selection_window.configure(bg='#1e293b')
     selection_window.resizable(False, False)
     
@@ -510,8 +510,8 @@ def show_app_selection():
     # Center window
     selection_window.update_idletasks()
     x = (selection_window.winfo_screenwidth() // 2) - (500 // 2)
-    y = (selection_window.winfo_screenheight() // 2) - (450 // 2)
-    selection_window.geometry(f"500x450+{x}+{y}")
+    y = (selection_window.winfo_screenheight() // 2) - (500 // 2)
+    selection_window.geometry(f"500x500+{x}+{y}")
     
     # Create main frame (also draggable)
     main_frame = tk.Frame(selection_window, bg='#1e293b', padx=30, pady=20)
@@ -623,6 +623,23 @@ def show_app_selection():
             traceback.print_exc()
             show_app_selection()
 
+    def launch_safe_content_scanner():
+        """Launch SafeContentDetectionGUI and destroy selection window"""
+        selection_window.destroy()  # Completely destroy to avoid conflicts
+        try:
+            from SafeContentDetectionGUI import SafeContentDetectionApp
+            # Create a new Tk instance
+            app_root = tk.Tk()
+            app = SafeContentDetectionApp(app_root)
+            app_root.mainloop()
+            # After app closes, show selection again
+            show_app_selection()
+        except Exception as e:
+            print(f"Error launching SafeContentDetectionGUI: {e}")
+            import traceback
+            traceback.print_exc()
+            show_app_selection()
+
     # Identify unwanted photo button
     unwanted_btn = tk.Button(button_frame,
                             text="🧹 Identify Unwanted Photos",
@@ -697,6 +714,21 @@ def show_app_selection():
                              padx=20, pady=5,
                              height=1)
     low_res_btn.pack(pady=5, fill=tk.X)
+
+    # Safe Content Scanner button
+    safe_btn = tk.Button(button_frame,
+                          text="🛡️ Safe Content Scanner",
+                          command=launch_safe_content_scanner,
+                          font=("Segoe UI", 12, "bold"),
+                          bg='#0891b2',           # cyan-600 (teal)
+                          fg='#f1f5f9',
+                          activebackground='#0e7490',
+                          activeforeground='#f1f5f9',
+                          bd=0, relief=tk.FLAT,
+                          cursor="hand2",
+                          padx=20, pady=5,
+                          height=1)
+    safe_btn.pack(pady=5, fill=tk.X)
 
     # Ensure window is visible and on top
     selection_window.lift()
