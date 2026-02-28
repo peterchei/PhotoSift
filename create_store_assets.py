@@ -4,6 +4,14 @@ Creates all required logo assets with proper transparency and scaling
 """
 from PIL import Image, ImageDraw, ImageFont
 import os
+import sys
+
+# Ensure Unicode characters (checkmarks etc.) work on Windows cp1252 terminals
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 
 def create_store_assets():
     """
@@ -22,7 +30,7 @@ def create_store_assets():
     os.makedirs(assets_dir, exist_ok=True)
     
     print("=" * 60)
-    print("Creating Microsoft Store Assets for PhotoSift v1.4.0")
+    print("Creating Microsoft Store Assets for PhotoSift v1.7.0")
     print("=" * 60)
     print()
 
